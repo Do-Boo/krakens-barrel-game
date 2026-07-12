@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#091a2a" />
+    <meta name="description" content="칼을 꽂고 크라켄 선장을 깨우는 2~6인 온라인 파티게임" />
     <title>크라켄의 술통</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏴‍☠️</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,38 +23,60 @@
           <span class="brand__eyebrow">PIRATE PARTY GAME</span>
           <h1>크라켄의 술통</h1>
         </div>
-        <button id="reset-button" class="icon-button" type="button">새 게임</button>
+        <div class="header-actions">
+          <button id="remote-button" class="icon-button icon-button--remote" type="button">📱 QR 컨트롤</button>
+          <button id="settings-button" class="icon-button" type="button">⚙ 게임 설정</button>
+        </div>
       </header>
+
+      <section class="tension-panel" aria-label="크라켄 긴장도">
+        <div class="tension-panel__row">
+          <span>크라켄 긴장도</span>
+          <strong id="tension-label">잠잠함</strong>
+        </div>
+        <div class="tension-track"><span id="tension-fill"></span></div>
+      </section>
+
+      <section id="scoreboard" class="scoreboard" aria-label="플레이어 점수"></section>
 
       <aside class="loadout-panel" aria-label="게임 스타일 선택">
         <div class="loadout-group">
           <span class="loadout-group__label">통 선택</span>
-          <div class="choice-row" role="group" aria-label="통 선택">
+          <div class="choice-row choice-row--containers" role="group" aria-label="통 선택">
             <button class="choice-button is-selected" type="button" data-container="wood" aria-pressed="true">
               <span>🪵</span> 오크통
             </button>
             <button class="choice-button" type="button" data-container="drum" aria-pressed="false">
               <span>🛢️</span> 드럼통
             </button>
+            <button class="choice-button" type="button" data-container="powder" aria-pressed="false">
+              <span>💥</span> 화약통
+            </button>
           </div>
         </div>
         <div class="loadout-group">
-          <span class="loadout-group__label">칼 디자인</span>
-          <div class="choice-row choice-row--swords" role="group" aria-label="칼 디자인">
+          <span class="loadout-group__label">무기 선택</span>
+          <div class="choice-row choice-row--swords" role="group" aria-label="무기 선택">
             <button class="sword-choice is-selected" type="button" data-sword="classic" aria-label="선장 해적검" title="선장 해적검" aria-pressed="true">⚔</button>
             <button class="sword-choice" type="button" data-sword="cutlass" aria-label="D가드 커틀러스" title="D가드 커틀러스" aria-pressed="false">☾</button>
             <button class="sword-choice" type="button" data-sword="dagger" aria-label="크라켄 단검" title="크라켄 단검" aria-pressed="false">♆</button>
+            <button class="sword-choice" type="button" data-sword="fish" aria-label="냉동 고등어" title="냉동 고등어" aria-pressed="false">🐟</button>
+            <button class="sword-choice" type="button" data-sword="carrot" aria-label="전설의 당근" title="전설의 당근" aria-pressed="false">🥕</button>
+            <button class="sword-choice" type="button" data-sword="umbrella" aria-label="선장의 우산" title="선장의 우산" aria-pressed="false">☂</button>
           </div>
         </div>
       </aside>
 
       <section class="turn-card" aria-live="polite">
         <div id="player-badge" class="player-badge">P1</div>
-        <div>
-          <span class="turn-card__label">현재 차례</span>
+        <div class="turn-card__copy">
+          <span id="round-label" class="turn-card__label">라운드 1 · 클래식</span>
           <strong id="turn-label">플레이어 1</strong>
         </div>
-        <span id="sword-count" class="sword-count">0 / 16</span>
+        <div class="turn-card__meta">
+          <span id="turn-timer" class="turn-timer" hidden>7.0</span>
+          <span id="sword-count" class="sword-count">0 / 16</span>
+        </div>
       </section>
 
       <section class="hint-card">
@@ -62,11 +85,84 @@
       </section>
 
       <section id="result-card" class="result-card" hidden>
-        <span class="result-card__eyebrow">KRAKEN!</span>
+        <span id="result-eyebrow" class="result-card__eyebrow">KRAKEN!</span>
         <h2 id="result-title">플레이어 1 패배</h2>
-        <p>저주받은 슬롯을 찾았습니다.</p>
-        <button id="play-again-button" type="button">한 판 더</button>
+        <p id="result-copy">저주받은 슬롯을 찾았습니다.</p>
+        <div id="result-scores" class="result-scores"></div>
+        <button id="play-again-button" type="button">다음 라운드</button>
       </section>
+
+      <dialog id="settings-dialog" class="game-dialog">
+        <div class="dialog-heading">
+          <div>
+            <span class="brand__eyebrow">GAME SETUP</span>
+            <h2>선원 명단과 규칙</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="settings-dialog" aria-label="닫기">×</button>
+        </div>
+
+        <div class="settings-section settings-section--inline">
+          <label for="player-count">플레이어 수</label>
+          <select id="player-count">
+            <option value="2">2명</option>
+            <option value="3">3명</option>
+            <option value="4">4명</option>
+            <option value="5">5명</option>
+            <option value="6">6명</option>
+          </select>
+        </div>
+
+        <div id="player-name-fields" class="player-name-fields"></div>
+
+        <div class="settings-section">
+          <span class="settings-label">게임 모드</span>
+          <div class="mode-grid" role="radiogroup" aria-label="게임 모드">
+            <button class="mode-button is-selected" type="button" data-mode="classic" aria-pressed="true">
+              <strong>클래식</strong><span>패배 구멍 1개</span>
+            </button>
+            <button class="mode-button" type="button" data-mode="double" aria-pressed="false">
+              <strong>더블 크라켄</strong><span>패배 구멍 2개</span>
+            </button>
+            <button class="mode-button" type="button" data-mode="speed" aria-pressed="false">
+              <strong>7초 속전속결</strong><span>시간 초과도 패배</span>
+            </button>
+            <button class="mode-button" type="button" data-mode="reverse" aria-pressed="false">
+              <strong>역전 모드</strong><span>크라켄을 깨우면 승리</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">승리 목표</span>
+          <div class="target-row" role="radiogroup" aria-label="승리 목표 점수">
+            <button type="button" data-target-score="1" aria-pressed="false">1점</button>
+            <button class="is-selected" type="button" data-target-score="3" aria-pressed="true">3점</button>
+            <button type="button" data-target-score="5" aria-pressed="false">5점</button>
+          </div>
+        </div>
+
+        <button id="start-game-button" class="primary-button" type="button">이 설정으로 시작</button>
+      </dialog>
+
+      <dialog id="remote-dialog" class="game-dialog game-dialog--remote">
+        <div class="dialog-heading">
+          <div>
+            <span class="brand__eyebrow">PHONE CONTROLLER</span>
+            <h2>휴대폰을 칼로 사용하기</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="remote-dialog" aria-label="닫기">×</button>
+        </div>
+        <p class="dialog-description">같은 게임 링크를 휴대폰으로 스캔하면 구멍 선택과 칼 꽂기를 원격으로 조작할 수 있습니다.</p>
+        <div class="remote-qr-shell">
+          <div id="remote-loading" class="remote-loading">방을 만드는 중…</div>
+          <img id="remote-qr" alt="휴대폰 컨트롤러 연결 QR 코드" hidden />
+        </div>
+        <strong id="remote-status" class="remote-status">연결 대기</strong>
+        <code id="remote-code" class="remote-code">------</code>
+        <button id="copy-remote-link" class="secondary-button" type="button" disabled>연결 링크 복사</button>
+      </dialog>
+
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
       <div id="loading" class="loading">
         <div class="loading__spinner"></div>
@@ -74,8 +170,40 @@
         <span id="loading-progress">0%</span>
       </div>
 
-      <footer class="footer-note">드래그해서 회전 · 스크롤해서 확대</footer>
+      <footer class="footer-note">드래그해서 회전 · 구멍을 눌러 찌르기</footer>
     </main>
-    <script type="module" src="/src/main.js"></script>
+
+    <main id="controller-app" class="controller-app" hidden>
+      <header class="controller-header">
+        <span class="brand__eyebrow">REMOTE CUTLASS</span>
+        <h1>크라켄 원격검</h1>
+        <p id="controller-status">게임에 연결하는 중…</p>
+      </header>
+      <section class="controller-card">
+        <span>현재 차례</span>
+        <strong id="controller-player">선장에게 연결 중</strong>
+        <div id="controller-tension" class="controller-tension"><span></span></div>
+      </section>
+      <section>
+        <h2>무기 선택</h2>
+        <div id="controller-weapons" class="controller-weapons">
+          <button class="is-selected" type="button" data-remote-weapon="classic">⚔</button>
+          <button type="button" data-remote-weapon="cutlass">☾</button>
+          <button type="button" data-remote-weapon="dagger">♆</button>
+          <button type="button" data-remote-weapon="fish">🐟</button>
+          <button type="button" data-remote-weapon="carrot">🥕</button>
+          <button type="button" data-remote-weapon="umbrella">☂</button>
+        </div>
+      </section>
+      <section>
+        <h2>구멍 선택</h2>
+        <div id="controller-slots" class="controller-slots"></div>
+      </section>
+      <button id="controller-insert" class="controller-insert" type="button" disabled>
+        <span>칼 꽂기</span><small>선택한 구멍을 공격합니다</small>
+      </button>
+    </main>
+
+    <script type="module" src="/src/bootstrap.js"></script>
   </body>
 </html>

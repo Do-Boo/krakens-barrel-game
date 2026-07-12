@@ -1,22 +1,73 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import '../styles.css';
+import { Peer } from 'peerjs';
+import QRCode from 'qrcode';
 
-const canvas = document.querySelector('#game-canvas');
-const loading = document.querySelector('#loading');
-const loadingProgress = document.querySelector('#loading-progress');
-const turnLabel = document.querySelector('#turn-label');
-const playerBadge = document.querySelector('#player-badge');
-const swordCount = document.querySelector('#sword-count');
-const hintLabel = document.querySelector('#hint-label');
-const resultCard = document.querySelector('#result-card');
-const resultTitle = document.querySelector('#result-title');
+const $ = (selector) => document.querySelector(selector);
+const canvas = $('#game-canvas');
+const loading = $('#loading');
+const loadingProgress = $('#loading-progress');
+const turnLabel = $('#turn-label');
+const roundLabel = $('#round-label');
+const playerBadge = $('#player-badge');
+const swordCount = $('#sword-count');
+const turnTimer = $('#turn-timer');
+const hintLabel = $('#hint-label');
+const tensionFill = $('#tension-fill');
+const tensionLabel = $('#tension-label');
+const scoreboard = $('#scoreboard');
+const resultCard = $('#result-card');
+const resultEyebrow = $('#result-eyebrow');
+const resultTitle = $('#result-title');
+const resultCopy = $('#result-copy');
+const resultScores = $('#result-scores');
+const resultButton = $('#play-again-button');
+const settingsDialog = $('#settings-dialog');
+const remoteDialog = $('#remote-dialog');
+const playerCountSelect = $('#player-count');
+const playerNameFields = $('#player-name-fields');
+const remoteQr = $('#remote-qr');
+const remoteLoading = $('#remote-loading');
+const remoteStatus = $('#remote-status');
+const remoteCode = $('#remote-code');
+const copyRemoteLinkButton = $('#copy-remote-link');
+const toast = $('#toast');
 const containerButtons = [...document.querySelectorAll('[data-container]')];
 const swordButtons = [...document.querySelectorAll('[data-sword]')];
+const modeButtons = [...document.querySelectorAll('[data-mode]')];
+const targetButtons = [...document.querySelectorAll('[data-target-score]')];
+const HTML_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => HTML_ESCAPE[character]);
+
+const PLAYER_COLORS = [
+  { css: '#4bd7e7', three: 0x4bd7e7 },
+  { css: '#ff7b70', three: 0xff7b70 },
+  { css: '#f3c860', three: 0xf3c860 },
+  { css: '#a78bfa', three: 0xa78bfa },
+  { css: '#73e29a', three: 0x73e29a },
+  { css: '#f38fca', three: 0xf38fca },
+];
+
+const MODE_CONFIGS = {
+  classic: { name: '클래식', triggerCount: 1, timeLimit: 0 },
+  double: { name: '더블 크라켄', triggerCount: 2, timeLimit: 0 },
+  speed: { name: '7초 속전속결', triggerCount: 1, timeLimit: 7 },
+  reverse: { name: '역전 모드', triggerCount: 1, timeLimit: 0 },
+};
+
+const WEAPON_NAMES = {
+  classic: '선장 해적검',
+  cutlass: 'D가드 커틀러스',
+  dagger: '크라켄 단검',
+  fish: '냉동 고등어',
+  carrot: '전설의 당근',
+  umbrella: '선장의 우산',
+};
 
 const CONTAINER_CONFIGS = {
   wood: {
+    name: '오크통',
     height: 3.4,
     rows: [0.84, 1.68, 2.52],
     openingRadius: 0.66,
@@ -26,6 +77,7 @@ const CONTAINER_CONFIGS = {
     },
   },
   drum: {
+    name: '코발트 드럼통',
     height: 3.72,
     rows: [0.92, 1.84, 2.76],
     openingRadius: 0.61,
@@ -33,10 +85,45 @@ const CONTAINER_CONFIGS = {
       return 1.365;
     },
   },
+  powder: {
+    name: '저주받은 화약통',
+    height: 3.48,
+    rows: [0.86, 1.72, 2.58],
+    openingRadius: 0.64,
+    radiusAt(height) {
+      const normalizedHeight = Math.abs(height - 1.74) / 1.74;
+      return 1.47 - normalizedHeight * normalizedHeight * 0.16;
+    },
+  },
 };
 
+let players = [
+  { name: '플레이어 1', score: 0, ...PLAYER_COLORS[0] },
+  { name: '플레이어 2', score: 0, ...PLAYER_COLORS[1] },
+];
+let gameMode = 'classic';
+let targetScore = 3;
+let roundNumber = 1;
+let roundStarter = 0;
+let currentPlayer = 0;
 let containerStyle = 'wood';
 let swordStyle = 'classic';
+let triggerSlots = new Set();
+let gameOver = false;
+let isAnimating = false;
+let hoveredSlot = null;
+let remoteSelectedSlot = null;
+let impactKick = 0;
+let fakeoutKick = 0;
+let piratePop = 0;
+let elapsed = 0;
+let lastFrameTime = 0;
+let turnDeadline = 0;
+let lastTimerSecond = null;
+let matchFinished = false;
+let toastTimeout = null;
+let audioContext = null;
+const firedFakeouts = new Set();
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x091726, 0.045);
@@ -77,6 +164,10 @@ const rimLight = new THREE.PointLight(0x17d7ff, 22, 12);
 rimLight.position.set(-4, 3, -3);
 scene.add(rimLight);
 
+const dangerLight = new THREE.PointLight(0xff3e2f, 0, 8);
+dangerLight.position.set(0, 3.5, 2.5);
+scene.add(dangerLight);
+
 const table = new THREE.Mesh(
   new THREE.CylinderGeometry(4.7, 5.1, 0.55, 64),
   new THREE.MeshStandardMaterial({ color: 0x4f2515, roughness: 0.82, metalness: 0.05 }),
@@ -103,16 +194,24 @@ const drumRoot = createDrumContainer();
 drumRoot.visible = false;
 gameRoot.add(drumRoot);
 
+const powderRoot = createPowderContainer();
+powderRoot.visible = false;
+gameRoot.add(powderRoot);
+
 const slotRoot = new THREE.Group();
 gameRoot.add(slotRoot);
 
-const swordRoot = new THREE.Group();
-gameRoot.add(swordRoot);
+const weaponRoot = new THREE.Group();
+gameRoot.add(weaponRoot);
+
+const effectsRoot = new THREE.Group();
+scene.add(effectsRoot);
+const particles = [];
 
 const openingRoot = new THREE.Group();
 const opening = new THREE.Mesh(
   new THREE.CylinderGeometry(0.57, 0.57, 0.035, 48),
-  new THREE.MeshStandardMaterial({ color: 0x090606, roughness: 0.96 }),
+  new THREE.MeshStandardMaterial({ color: 0x060405, roughness: 0.96 }),
 );
 opening.position.y = 2.91;
 opening.receiveShadow = true;
@@ -127,24 +226,18 @@ openingRim.position.y = 2.935;
 openingRoot.add(openingRim);
 gameRoot.add(openingRoot);
 
-const pirate = createPiratePlaceholder();
-pirate.position.set(0, 2.28, 0);
+const pirate = createPirateCaptain();
 pirate.scale.setScalar(0.001);
 gameRoot.add(pirate);
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const slots = [];
-const insertedSwords = [];
-let triggerSlot = 0;
-let currentPlayer = 0;
-let gameOver = false;
-let isAnimating = false;
-let hoveredSlot = null;
-let impactKick = 0;
-let piratePop = 0;
-let elapsed = 0;
-let lastFrameTime = 0;
+const insertedWeapons = [];
+
+let remotePeer = null;
+let remoteConnection = null;
+let remoteLink = '';
 
 function createDrumContainer() {
   const root = new THREE.Group();
@@ -201,50 +294,214 @@ function createDrumContainer() {
     new THREE.MeshStandardMaterial({ color: 0x183e5f, metalness: 0.9, roughness: 0.3 }),
   );
   bungInset.position.y = 0.035;
-  bungInset.castShadow = true;
   bung.add(bungInset);
   root.add(bung);
   return root;
 }
 
-function createPiratePlaceholder() {
+function createPowderContainer() {
   const root = new THREE.Group();
-  const coat = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.32, 0.45, 6, 16),
-    new THREE.MeshStandardMaterial({ color: 0xd83d4d, roughness: 0.65 }),
-  );
-  coat.position.y = 0.35;
-  coat.castShadow = true;
-  root.add(coat);
+  const woodMaterial = new THREE.MeshStandardMaterial({ color: 0x251c1a, roughness: 0.88, metalness: 0.03 });
+  const charMaterial = new THREE.MeshStandardMaterial({ color: 0x0e0c0c, roughness: 0.94 });
+  const bandMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xa52c28,
+    metalness: 0.78,
+    roughness: 0.28,
+    clearcoat: 0.35,
+  });
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.3, 24, 18),
-    new THREE.MeshStandardMaterial({ color: 0xf2b47e, roughness: 0.7 }),
-  );
-  head.position.y = 0.9;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.31, 1.31, 3.42, 24), woodMaterial);
+  body.position.y = 1.73;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  root.add(body);
+
+  for (let index = 0; index < 16; index += 1) {
+    const angle = (index / 16) * Math.PI * 2;
+    const stave = new THREE.Mesh(new THREE.BoxGeometry(0.17, 3.32, 0.07), charMaterial);
+    stave.position.set(Math.sin(angle) * 1.31, 1.73, Math.cos(angle) * 1.31);
+    stave.rotation.y = angle;
+    stave.castShadow = true;
+    root.add(stave);
+  }
+
+  [0.34, 1.72, 3.12].forEach((height) => {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(1.39, 0.075, 10, 64), bandMaterial);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = height;
+    band.castShadow = true;
+    root.add(band);
+  });
+
+  const warning = new THREE.Group();
+  warning.position.set(0, 1.73, 1.35);
+  const skullMaterial = new THREE.MeshStandardMaterial({ color: 0xe6d5a8, roughness: 0.72 });
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 14), skullMaterial);
+  skull.scale.y = 0.85;
+  warning.add(skull);
+  [-0.08, 0.08].forEach((x) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), charMaterial);
+    eye.position.set(x, 0.03, 0.2);
+    warning.add(eye);
+  });
+  [-1, 1].forEach((side) => {
+    const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.55, 8), skullMaterial);
+    bone.position.set(side * 0.03, -0.18, -0.01);
+    bone.rotation.z = side * 0.82;
+    warning.add(bone);
+  });
+  root.add(warning);
+  return root;
+}
+
+function createPirateCaptain() {
+  const root = new THREE.Group();
+  const coatMaterial = new THREE.MeshStandardMaterial({ color: 0xa92335, roughness: 0.64 });
+  const goldMaterial = new THREE.MeshPhysicalMaterial({ color: 0xe9b440, metalness: 0.76, roughness: 0.24 });
+  const skinMaterial = new THREE.MeshStandardMaterial({ color: 0xe8a16e, roughness: 0.72 });
+  const beardMaterial = new THREE.MeshStandardMaterial({ color: 0x183d46, roughness: 0.88 });
+  const hatMaterial = new THREE.MeshStandardMaterial({ color: 0x101a2b, roughness: 0.48 });
+  const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xf2e5c8, roughness: 0.7 });
+
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.5, 8, 20), coatMaterial);
+  body.position.y = 0.38;
+  body.castShadow = true;
+  root.add(body);
+
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.04, 8, 28), hatMaterial);
+  belt.rotation.x = Math.PI / 2;
+  belt.position.y = 0.26;
+  root.add(belt);
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.13, 0.06), goldMaterial);
+  buckle.position.set(0, 0.26, 0.34);
+  root.add(buckle);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 28, 20), skinMaterial);
+  head.position.y = 1.0;
   head.castShadow = true;
   root.add(head);
 
-  const hat = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.42, 0.24, 3),
-    new THREE.MeshStandardMaterial({ color: 0x182539, roughness: 0.5 }),
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 9), skinMaterial);
+  nose.position.set(0, 0.99, 0.3);
+  root.add(nose);
+
+  const eye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.055, 12, 9),
+    new THREE.MeshStandardMaterial({ color: 0xf7d55f, emissive: 0x7a3f00, emissiveIntensity: 0.8 }),
   );
-  hat.position.y = 1.17;
-  hat.rotation.y = Math.PI / 2;
-  root.add(hat);
+  eye.position.set(-0.11, 1.08, 0.28);
+  root.add(eye);
+
+  const patch = new THREE.Mesh(new THREE.SphereGeometry(0.083, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), hatMaterial);
+  patch.rotation.x = Math.PI / 2;
+  patch.position.set(0.11, 1.09, 0.27);
+  root.add(patch);
+  const patchBand = createCurvedGuard([
+    [-0.25, 0.02, 0], [0, 0.08, 0.04], [0.25, -0.02, 0],
+  ], hatMaterial, 0.014);
+  patchBand.position.set(0, 1.11, 0.28);
+  root.add(patchBand);
+
+  const beard = new THREE.Group();
+  beard.position.set(0, 0.84, 0.4);
+  for (let index = -2; index <= 2; index += 1) {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(index * 0.075, 0.02, 0),
+      new THREE.Vector3(index * 0.08, -0.16, 0.02),
+      new THREE.Vector3(index * 0.11 + Math.sin(index) * 0.03, -0.34, -0.01),
+    ]);
+    const tentacle = new THREE.Mesh(new THREE.TubeGeometry(curve, 15, 0.035, 7, false), beardMaterial);
+    tentacle.castShadow = true;
+    beard.add(tentacle);
+  }
+  root.add(beard);
+
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.48, 0.1, 3), hatMaterial);
+  hatBrim.position.y = 1.27;
+  hatBrim.rotation.y = Math.PI / 2;
+  root.add(hatBrim);
+  const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.3, 3), hatMaterial);
+  hatCrown.position.y = 1.44;
+  hatCrown.rotation.y = Math.PI / 2;
+  root.add(hatCrown);
+  const hatTrim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 7, 3), goldMaterial);
+  hatTrim.rotation.x = Math.PI / 2;
+  hatTrim.position.set(0, 1.34, 0.03);
+  root.add(hatTrim);
+
+  const emblem = new THREE.Group();
+  emblem.position.set(0, 1.44, 0.29);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 9), whiteMaterial);
+  emblem.add(skull);
+  [-1, 1].forEach((side) => {
+    const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.18, 6), whiteMaterial);
+    bone.rotation.z = side * 0.8;
+    emblem.add(bone);
+  });
+  root.add(emblem);
+
+  const leftArm = new THREE.Group();
+  const leftSleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.35, 5, 10), coatMaterial);
+  leftSleeve.rotation.z = -0.9;
+  leftArm.add(leftSleeve);
+  leftArm.position.set(-0.4, 0.62, 0);
+  root.add(leftArm);
+
+  const rightArm = new THREE.Group();
+  const rightSleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.35, 5, 10), coatMaterial);
+  rightSleeve.rotation.z = 0.9;
+  rightArm.add(rightSleeve);
+  const hook = createCurvedGuard([
+    [0, 0, 0], [0.12, -0.05, 0], [0.17, 0.07, 0], [0.08, 0.12, 0],
+  ], goldMaterial, 0.025);
+  hook.position.set(0.2, -0.18, 0);
+  rightArm.add(hook);
+  rightArm.position.set(0.4, 0.62, 0);
+  root.add(rightArm);
+
+  root.userData = { eye, leftArm, rightArm, beard, hatCrown };
+  root.traverse((object) => {
+    if (object.isMesh) object.castShadow = true;
+  });
   return root;
+}
+
+function createNumberSprite(number) {
+  const labelCanvas = document.createElement('canvas');
+  labelCanvas.width = 64;
+  labelCanvas.height = 64;
+  const context = labelCanvas.getContext('2d');
+  context.fillStyle = 'rgba(5, 13, 20, .9)';
+  context.beginPath();
+  context.arc(32, 32, 25, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = '#f3c860';
+  context.lineWidth = 4;
+  context.stroke();
+  context.fillStyle = '#fff6dd';
+  context.font = '900 25px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(String(number), 32, 33);
+  const texture = new THREE.CanvasTexture(labelCanvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+  sprite.scale.set(0.28, 0.28, 0.28);
+  sprite.position.set(0, 0.22, -0.08);
+  sprite.visible = false;
+  sprite.renderOrder = 5;
+  return sprite;
 }
 
 function buildSlots() {
   slotRoot.clear();
   slots.length = 0;
-
-  const rows = [0, 1, 2];
   const counts = [5, 6, 5];
   let index = 0;
-  rows.forEach((_, rowIndex) => {
-    for (let i = 0; i < counts[rowIndex]; i += 1) {
-      const angle = (i / counts[rowIndex]) * Math.PI * 2 + rowIndex * 0.34;
+
+  counts.forEach((count, rowIndex) => {
+    for (let column = 0; column < count; column += 1) {
+      const angle = (column / count) * Math.PI * 2 + rowIndex * 0.34;
       const group = new THREE.Group();
       group.userData = { slotIndex: index, rowIndex, angle, used: false };
 
@@ -264,32 +521,31 @@ function buildSlots() {
 
       const target = new THREE.Mesh(
         new THREE.CircleGeometry(0.098, 24),
-        new THREE.MeshStandardMaterial({
-          color: 0x060303,
-          roughness: 1,
-          side: THREE.DoubleSide,
-        }),
+        new THREE.MeshStandardMaterial({ color: 0x060303, roughness: 1, side: THREE.DoubleSide }),
       );
       target.position.z = -0.021;
       target.userData.slotGroup = group;
       group.add(target);
 
       const hitArea = new THREE.Mesh(
-        new THREE.CircleGeometry(0.19, 20),
-        new THREE.MeshBasicMaterial({
-          transparent: true,
-          opacity: 0,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
+        new THREE.CircleGeometry(0.2, 20),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
       );
       hitArea.position.z = -0.055;
       hitArea.userData.slotGroup = group;
       group.add(hitArea);
 
+      const damage = new THREE.Group();
+      damage.visible = false;
+      group.add(damage);
+
+      const label = createNumberSprite(index + 1);
+      group.add(label);
+
       group.userData.ring = ring;
       group.userData.target = target;
-
+      group.userData.damage = damage;
+      group.userData.label = label;
       slotRoot.add(group);
       slots.push(group);
       index += 1;
@@ -302,6 +558,7 @@ function updateContainerLayout() {
   const config = CONTAINER_CONFIGS[containerStyle];
   barrelRoot.visible = containerStyle === 'wood';
   drumRoot.visible = containerStyle === 'drum';
+  powderRoot.visible = containerStyle === 'powder';
 
   slots.forEach((slot) => {
     const { rowIndex, angle } = slot.userData;
@@ -329,21 +586,25 @@ function selectContainer(style) {
     button.setAttribute('aria-pressed', String(selected));
   });
   updateContainerLayout();
-  resetGame();
-  hintLabel.textContent = style === 'wood'
-    ? '더 커진 오크통에서 구멍을 선택하세요'
-    : '금속 드럼통에서 구멍을 선택하세요';
+  resetRound();
+  const hints = {
+    wood: '나무 파편을 조심하며 오크통을 노리세요',
+    drum: '코발트 드럼통의 금속 구멍을 선택하세요',
+    powder: '화약통은 충격마다 불꽃과 연기를 뿜습니다',
+  };
+  hintLabel.textContent = hints[style];
 }
 
 function selectSword(style) {
+  if (!WEAPON_NAMES[style]) return;
   swordStyle = style;
   swordButtons.forEach((button) => {
     const selected = button.dataset.sword === style;
     button.classList.toggle('is-selected', selected);
     button.setAttribute('aria-pressed', String(selected));
   });
-  const names = { classic: '선장 해적검', cutlass: 'D가드 커틀러스', dagger: '크라켄 단검' };
-  hintLabel.textContent = `${names[style]} 선택 — 다음 구멍을 노리세요`;
+  hintLabel.textContent = `${WEAPON_NAMES[style]} 선택 — 다음 구멍을 노리세요`;
+  sendGameState();
 }
 
 function createShapedBlade(style, material) {
@@ -367,7 +628,6 @@ function createShapedBlade(style, material) {
     shape.lineTo(0.115, -0.2);
   }
   shape.closePath();
-
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: style === 'dagger' ? 0.07 : 0.05,
     bevelEnabled: true,
@@ -388,22 +648,70 @@ function createCurvedGuard(points, material, radius = 0.025) {
   return guard;
 }
 
-function createSword(slot, player) {
-  const design = swordStyle;
-  const sword = new THREE.Group();
-  sword.position.copy(slot.position);
-  sword.quaternion.copy(slot.quaternion);
-  const designRoll = design === 'cutlass' ? 0.34 : design === 'dagger' ? 0.04 : 0.12;
-  sword.rotateZ(player === 0 ? -designRoll : designRoll);
-  sword.translateZ(-1.24);
-  sword.userData.target = slot.position.clone();
-  sword.userData.progress = 0;
-  sword.userData.impacted = false;
-  sword.userData.player = player;
-  sword.userData.slot = slot;
-  sword.userData.startedAt = elapsed;
-  sword.userData.design = design;
+function addComicWeapon(weapon, design) {
+  if (design === 'fish') {
+    const fishMaterial = new THREE.MeshPhysicalMaterial({ color: 0x62b9ca, metalness: 0.18, roughness: 0.35, clearcoat: 0.5 });
+    const bellyMaterial = new THREE.MeshStandardMaterial({ color: 0xbce5df, roughness: 0.5 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.19, 22, 14), fishMaterial);
+    body.scale.set(0.78, 0.58, 2.45);
+    body.position.z = -0.13;
+    body.castShadow = true;
+    weapon.add(body);
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.155, 18, 12), bellyMaterial);
+    belly.scale.set(0.72, 0.24, 2.1);
+    belly.position.set(0, -0.12, -0.1);
+    weapon.add(belly);
+    [-1, 1].forEach((side) => {
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.35, 3), fishMaterial);
+      tail.rotation.x = -Math.PI / 2;
+      tail.rotation.z = side * 0.45;
+      tail.position.set(side * 0.1, 0, -0.62);
+      weapon.add(tail);
+    });
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0x07090a, roughness: 0.8 }),
+    );
+    eye.position.set(0.13, 0.055, 0.22);
+    weapon.add(eye);
+    return;
+  }
 
+  if (design === 'carrot') {
+    const carrotMaterial = new THREE.MeshStandardMaterial({ color: 0xf07b27, roughness: 0.68 });
+    const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x49a95d, roughness: 0.78 });
+    const carrot = new THREE.Mesh(new THREE.ConeGeometry(0.17, 1.2, 18), carrotMaterial);
+    carrot.rotation.x = Math.PI / 2;
+    carrot.position.z = 0.37;
+    carrot.castShadow = true;
+    weapon.add(carrot);
+    for (let index = -1; index <= 1; index += 1) {
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.38, 9), leafMaterial);
+      leaf.rotation.x = -Math.PI / 2 + index * 0.23;
+      leaf.rotation.z = index * 0.35;
+      leaf.position.set(index * 0.07, 0, -0.31);
+      weapon.add(leaf);
+    }
+    return;
+  }
+
+  const shaftMaterial = new THREE.MeshPhysicalMaterial({ color: 0x9ad8e5, metalness: 0.82, roughness: 0.22 });
+  const fabricMaterial = new THREE.MeshStandardMaterial({ color: 0x7d4cd6, roughness: 0.52, side: THREE.DoubleSide });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.35, 10), shaftMaterial);
+  shaft.rotation.x = Math.PI / 2;
+  shaft.position.z = 0.22;
+  weapon.add(shaft);
+  const foldedCanopy = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.72, 12, 1, true), fabricMaterial);
+  foldedCanopy.rotation.x = Math.PI / 2;
+  foldedCanopy.position.z = 0.43;
+  weapon.add(foldedCanopy);
+  const hook = createCurvedGuard([
+    [0, 0, -0.46], [0, 0, -0.7], [0.13, 0, -0.84], [0.24, 0, -0.72],
+  ], shaftMaterial, 0.033);
+  weapon.add(hook);
+}
+
+function addSwordWeapon(weapon, design, player) {
   const bladeMaterial = new THREE.MeshPhysicalMaterial({
     color: design === 'dagger' ? 0xbfeaff : 0xe4f6f7,
     metalness: 0.94,
@@ -411,7 +719,7 @@ function createSword(slot, player) {
     clearcoat: 0.55,
     clearcoatRoughness: 0.08,
   });
-  sword.add(createShapedBlade(design, bladeMaterial));
+  weapon.add(createShapedBlade(design, bladeMaterial));
 
   const guardMaterial = new THREE.MeshPhysicalMaterial({
     color: design === 'dagger' ? 0x8fd9ec : design === 'cutlass' ? 0xd89d2d : 0xe8b33f,
@@ -420,59 +728,51 @@ function createSword(slot, player) {
     clearcoat: 0.35,
   });
   if (design === 'classic') {
-    sword.add(createCurvedGuard([
+    weapon.add(createCurvedGuard([
       [-0.34, 0, -0.22], [-0.2, 0.025, -0.26], [0, 0, -0.27],
       [0.2, -0.025, -0.26], [0.34, 0, -0.22],
     ], guardMaterial, 0.034));
     [-1, 1].forEach((side) => {
       const cap = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), guardMaterial);
       cap.position.set(side * 0.34, 0, -0.22);
-      sword.add(cap);
+      weapon.add(cap);
     });
   } else if (design === 'cutlass') {
-    sword.add(createCurvedGuard([
+    weapon.add(createCurvedGuard([
       [-0.27, 0, -0.22], [-0.42, 0.02, -0.38], [-0.4, 0.01, -0.64],
       [-0.24, 0, -0.83], [-0.04, 0, -0.82],
     ], guardMaterial, 0.033));
-    sword.add(createCurvedGuard([
+    weapon.add(createCurvedGuard([
       [-0.27, 0, -0.22], [-0.08, 0.035, -0.27], [0.18, 0, -0.25],
     ], guardMaterial, 0.038));
   } else {
-    sword.add(createCurvedGuard([
+    weapon.add(createCurvedGuard([
       [0, 0, -0.26], [-0.2, 0.04, -0.3], [-0.35, -0.02, -0.22], [-0.3, -0.01, -0.1],
     ], guardMaterial, 0.032));
-    sword.add(createCurvedGuard([
+    weapon.add(createCurvedGuard([
       [0, 0, -0.26], [0.2, -0.04, -0.3], [0.35, 0.02, -0.22], [0.3, 0.01, -0.1],
     ], guardMaterial, 0.032));
   }
 
-  const gripColor = player === 0 ? 0x36cde2 : 0xff685f;
   const gripLength = design === 'cutlass' ? 0.48 : design === 'dagger' ? 0.38 : 0.42;
   const handle = new THREE.Mesh(
     new THREE.CylinderGeometry(0.075, 0.075, gripLength, 12),
-    new THREE.MeshStandardMaterial({ color: gripColor, roughness: 0.56, metalness: 0.08 }),
+    new THREE.MeshStandardMaterial({ color: players[player].three, roughness: 0.56, metalness: 0.08 }),
   );
   handle.rotation.x = Math.PI / 2;
   handle.position.z = design === 'cutlass' ? -0.55 : design === 'dagger' ? -0.48 : -0.51;
   handle.castShadow = true;
-  sword.add(handle);
+  weapon.add(handle);
 
-  const wrapMaterial = new THREE.MeshStandardMaterial({
-    color: player === 0 ? 0x0c6578 : 0x8c282d,
-    metalness: 0.18,
-    roughness: 0.48,
-  });
-  const wrapCenter = handle.position.z;
-  for (let i = -2; i <= 2; i += 1) {
+  const wrapMaterial = new THREE.MeshStandardMaterial({ color: 0x18333b, metalness: 0.18, roughness: 0.48 });
+  for (let index = -2; index <= 2; index += 1) {
     const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.009, 6, 14), wrapMaterial);
-    wrap.position.z = wrapCenter + i * (gripLength * 0.18);
-    sword.add(wrap);
+    wrap.position.z = handle.position.z + index * (gripLength * 0.18);
+    weapon.add(wrap);
   }
 
   const pommel = new THREE.Mesh(
-    design === 'dagger'
-      ? new THREE.OctahedronGeometry(0.12)
-      : new THREE.SphereGeometry(0.105, 14, 10),
+    design === 'dagger' ? new THREE.OctahedronGeometry(0.12) : new THREE.SphereGeometry(0.105, 14, 10),
     new THREE.MeshStandardMaterial({
       color: design === 'dagger' ? 0x37d9e6 : 0xe4ad32,
       emissive: design === 'dagger' ? 0x063e65 : 0x000000,
@@ -482,105 +782,340 @@ function createSword(slot, player) {
     }),
   );
   pommel.position.z = design === 'cutlass' ? -0.83 : design === 'dagger' ? -0.7 : -0.75;
-  pommel.castShadow = true;
-  sword.add(pommel);
-  return sword;
+  weapon.add(pommel);
 }
 
-function playTone(frequency, duration, type = 'sine') {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
-  const context = new AudioContext();
+function createWeapon(slot, player) {
+  const design = swordStyle;
+  const weapon = new THREE.Group();
+  weapon.position.copy(slot.position);
+  weapon.quaternion.copy(slot.quaternion);
+  const designRoll = design === 'cutlass' ? 0.34 : design === 'fish' ? -0.16 : design === 'umbrella' ? 0.28 : 0.1;
+  weapon.rotateZ(player % 2 === 0 ? -designRoll : designRoll);
+  weapon.translateZ(-1.24);
+  weapon.userData = {
+    target: slot.position.clone(),
+    progress: 0,
+    impacted: false,
+    player,
+    slot,
+    startedAt: elapsed,
+    design,
+  };
+
+  if (['fish', 'carrot', 'umbrella'].includes(design)) addComicWeapon(weapon, design);
+  else addSwordWeapon(weapon, design, player);
+
+  weapon.traverse((object) => {
+    if (object.isMesh) object.castShadow = true;
+  });
+  return weapon;
+}
+
+function ensureAudio() {
+  if (!audioContext) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) audioContext = new AudioContext();
+  }
+  if (audioContext?.state === 'suspended') audioContext.resume();
+  return audioContext;
+}
+
+function playTone(frequency, duration, type = 'sine', volume = 0.08, delay = 0) {
+  const context = ensureAudio();
+  if (!context) return;
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.type = type;
-  oscillator.frequency.value = frequency;
-  gain.gain.setValueAtTime(0.08, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
+  oscillator.frequency.setValueAtTime(frequency, context.currentTime + delay);
+  gain.gain.setValueAtTime(volume, context.currentTime + delay);
+  gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + delay + duration);
   oscillator.connect(gain).connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + duration);
+  oscillator.start(context.currentTime + delay);
+  oscillator.stop(context.currentTime + delay + duration);
 }
 
-function insertSword(slot) {
+function playImpactSound() {
+  const profiles = {
+    wood: [[112, 0.2, 'square'], [68, 0.3, 'sine']],
+    drum: [[410, 0.18, 'triangle'], [185, 0.42, 'sine']],
+    powder: [[82, 0.35, 'sawtooth'], [46, 0.5, 'sine']],
+  };
+  profiles[containerStyle].forEach(([frequency, duration, type], index) => {
+    playTone(frequency, duration, type, index ? 0.055 : 0.075, index * 0.045);
+  });
+}
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.hidden = false;
+  window.clearTimeout(toastTimeout);
+  toastTimeout = window.setTimeout(() => { toast.hidden = true; }, 2200);
+}
+
+function createDamageMark(slot) {
+  const damage = slot.userData.damage;
+  damage.clear();
+  damage.visible = true;
+  if (containerStyle === 'drum') {
+    const dent = new THREE.Mesh(
+      new THREE.TorusGeometry(0.135, 0.014, 7, 28),
+      new THREE.MeshStandardMaterial({ color: 0x7ecdf1, metalness: 0.92, roughness: 0.18 }),
+    );
+    dent.scale.y = 0.8;
+    dent.position.z = -0.035;
+    damage.add(dent);
+    return;
+  }
+
+  const crackMaterial = new THREE.MeshBasicMaterial({ color: containerStyle === 'powder' ? 0x030202 : 0x2b1208 });
+  [0.1, 2.2, 4.25].forEach((angle, index) => {
+    const crack = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.18 + index * 0.03, 0.01), crackMaterial);
+    crack.rotation.z = angle;
+    crack.position.set(Math.cos(angle) * 0.13, Math.sin(angle) * 0.13, -0.038);
+    damage.add(crack);
+  });
+}
+
+function spawnImpactParticles(slot) {
+  const origin = new THREE.Vector3();
+  slot.getWorldPosition(origin);
+  const outward = new THREE.Vector3(0, 0, -1).applyQuaternion(slot.getWorldQuaternion(new THREE.Quaternion()));
+  const count = containerStyle === 'powder' ? 20 : 12;
+  for (let index = 0; index < count; index += 1) {
+    let geometry;
+    let material;
+    if (containerStyle === 'wood') {
+      geometry = new THREE.BoxGeometry(0.025, 0.07, 0.025);
+      material = new THREE.MeshStandardMaterial({ color: index % 2 ? 0x9a5928 : 0x5d3016, roughness: 0.9 });
+    } else if (containerStyle === 'drum') {
+      geometry = new THREE.SphereGeometry(0.018, 7, 5);
+      material = new THREE.MeshBasicMaterial({ color: index % 3 ? 0x8adfff : 0xffffff });
+    } else {
+      geometry = index % 3 === 0 ? new THREE.SphereGeometry(0.06, 8, 6) : new THREE.SphereGeometry(0.022, 7, 5);
+      material = new THREE.MeshBasicMaterial({
+        color: index % 3 === 0 ? 0x3d3531 : index % 2 ? 0xffa126 : 0xffe078,
+        transparent: index % 3 === 0,
+        opacity: index % 3 === 0 ? 0.65 : 1,
+      });
+    }
+    const particle = new THREE.Mesh(geometry, material);
+    particle.position.copy(origin).addScaledVector(outward, 0.08);
+    particle.userData.velocity = outward.clone().multiplyScalar(0.55 + Math.random() * 0.8);
+    particle.userData.velocity.x += (Math.random() - 0.5) * 0.7;
+    particle.userData.velocity.y += (Math.random() - 0.15) * 0.7;
+    particle.userData.velocity.z += (Math.random() - 0.5) * 0.7;
+    particle.userData.life = 0.55 + Math.random() * 0.45;
+    particle.userData.maxLife = particle.userData.life;
+    effectsRoot.add(particle);
+    particles.push(particle);
+  }
+}
+
+function updateTension() {
+  const tension = Math.min(1, insertedWeapons.length / Math.max(1, slots.length - triggerSlots.size));
+  tensionFill.style.width = `${Math.round(tension * 100)}%`;
+  tensionLabel.textContent = tension < 0.25 ? '잠잠함' : tension < 0.55 ? '꿈틀거림' : tension < 0.8 ? '위험' : '폭발 직전';
+  dangerLight.intensity = tension * tension * 18;
+  rimLight.intensity = 22 + tension * 12;
+  sendGameState();
+}
+
+function insertWeapon(slot) {
   if (gameOver || isAnimating || slot.userData.used) return;
+  ensureAudio();
   isAnimating = true;
   slot.userData.used = true;
   hoveredSlot = null;
+  remoteSelectedSlot = null;
   canvas.classList.remove('is-aiming');
-  hintLabel.textContent = '칼을 힘껏 꽂는 중…';
-
-  const sword = createSword(slot, currentPlayer);
-  swordRoot.add(sword);
-  insertedSwords.push(sword);
-  playTone(340, 0.09, 'triangle');
+  hintLabel.textContent = `${WEAPON_NAMES[swordStyle]}을 힘껏 꽂는 중…`;
+  const weapon = createWeapon(slot, currentPlayer);
+  weaponRoot.add(weapon);
+  insertedWeapons.push(weapon);
+  playTone(340 + insertedWeapons.length * 8, 0.09, 'triangle', 0.06);
+  sendGameState();
 }
 
-function resolveSwordImpact(sword) {
-  const { slot, player } = sword.userData;
-  impactKick = 1;
+function triggerFakeout() {
+  fakeoutKick = 1;
+  document.body.classList.remove('is-fakeout');
+  void document.body.offsetWidth;
+  document.body.classList.add('is-fakeout');
+  hintLabel.textContent = '잠깐… 통 안에서 무언가 움직였습니다!';
+  playTone(74, 0.48, 'sawtooth', 0.07);
+  playTone(132, 0.22, 'square', 0.04, 0.18);
+  navigator.vibrate?.([70, 40, 100]);
+  sendRemote({ type: 'fakeout' });
+  window.setTimeout(() => {
+    document.body.classList.remove('is-fakeout');
+    if (!gameOver) hintLabel.textContent = `${players[currentPlayer].name}, 아직 안전합니다`;
+  }, 720);
+}
+
+function maybeTriggerFakeout() {
+  const count = insertedWeapons.length;
+  if (![3, 6, 10, 13].includes(count) || firedFakeouts.has(count)) return;
+  firedFakeouts.add(count);
+  triggerFakeout();
+}
+
+function resolveWeaponImpact(weapon) {
+  const { slot, player } = weapon.userData;
+  impactKick = containerStyle === 'powder' ? 1.35 : 1;
+  createDamageMark(slot);
+  spawnImpactParticles(slot);
   slot.userData.ring.material.color.setHex(0x251a14);
   slot.userData.ring.material.emissive.setHex(0x080402);
   slot.userData.ring.material.emissiveIntensity = 0.05;
   slot.userData.target.material.color.setHex(0x020101);
-  playTone(105, 0.22, 'square');
-  window.setTimeout(() => playTone(62, 0.28, 'sine'), 55);
+  playImpactSound();
+  navigator.vibrate?.([25, 20, containerStyle === 'powder' ? 100 : 55]);
+  sendRemote({ type: 'impact' });
+  updateTension();
   updateHud();
 
-  if (slot.userData.slotIndex === triggerSlot) {
-    gameOver = true;
-    currentPlayer = player;
-    window.setTimeout(() => triggerPirate(), 190);
-  } else {
-    currentPlayer = (player + 1) % 2;
-    window.setTimeout(() => {
-      hintLabel.textContent = '다음 플레이어, 구멍을 선택하세요';
-      updateHud();
-    }, 170);
+  if (triggerSlots.has(slot.userData.slotIndex)) {
+    if (gameMode === 'reverse') endRound({ winnerIndex: player, reason: '크라켄을 깨워 보물을 차지했습니다!' });
+    else endRound({ loserIndex: player, reason: '저주받은 구멍에서 크라켄이 깨어났습니다.' });
+    return;
   }
+
+  currentPlayer = (player + 1) % players.length;
+  startTurnTimer();
+  maybeTriggerFakeout();
+  window.setTimeout(() => {
+    if (!gameOver && fakeoutKick <= 0.05) hintLabel.textContent = `${players[currentPlayer].name}, 구멍을 선택하세요`;
+    updateHud();
+    sendGameState();
+  }, 220);
+}
+
+function awardRound({ winnerIndex, loserIndex }) {
+  if (winnerIndex !== undefined) {
+    players[winnerIndex].score += gameMode === 'reverse' ? 2 : 1;
+    return;
+  }
+  players.forEach((player, index) => {
+    if (index !== loserIndex) player.score += 1;
+  });
+}
+
+function endRound({ winnerIndex, loserIndex, reason }) {
+  if (gameOver) return;
+  gameOver = true;
+  isAnimating = false;
+  turnDeadline = 0;
+  awardRound({ winnerIndex, loserIndex });
+  matchFinished = players.some((player) => player.score >= targetScore);
+  resultEyebrow.textContent = winnerIndex !== undefined ? 'TREASURE!' : 'KRAKEN!';
+  resultTitle.textContent = winnerIndex !== undefined
+    ? `${players[winnerIndex].name} 승리`
+    : `${players[loserIndex].name} 패배`;
+  resultCopy.textContent = reason;
+  resultScores.innerHTML = players.map((player) => `<span>${escapeHtml(player.name)} ${player.score}점</span>`).join('');
+  resultButton.textContent = matchFinished ? '새 매치 시작' : '다음 라운드';
+  window.setTimeout(triggerPirate, 190);
+  updateHud();
+  sendGameState();
 }
 
 function triggerPirate() {
-  playTone(95, 0.7, 'sawtooth');
-  resultTitle.textContent = `플레이어 ${currentPlayer + 1} 패배`;
+  playTone(92, 0.75, 'sawtooth', 0.09);
+  playTone(185, 0.42, 'square', 0.05, 0.12);
+  playTone(48, 0.9, 'sine', 0.08, 0.05);
   resultCard.hidden = false;
-  hintLabel.textContent = '크라켄이 깨어났습니다!';
+  hintLabel.textContent = gameMode === 'reverse' ? '크라켄의 보물이 열렸습니다!' : '크라켄 선장이 깨어났습니다!';
   document.body.classList.add('is-failed');
+  navigator.vibrate?.([140, 60, 200]);
+  sendRemote({ type: 'kraken' });
 }
 
-function resetGame() {
+function chooseTriggerSlots() {
+  triggerSlots = new Set();
+  while (triggerSlots.size < MODE_CONFIGS[gameMode].triggerCount) {
+    triggerSlots.add(Math.floor(Math.random() * slots.length));
+  }
+}
+
+function startTurnTimer() {
+  const limit = MODE_CONFIGS[gameMode].timeLimit;
+  turnDeadline = limit ? performance.now() + limit * 1000 : 0;
+  lastTimerSecond = null;
+  turnTimer.hidden = !limit;
+  turnTimer.classList.remove('is-urgent');
+  if (limit) turnTimer.textContent = limit.toFixed(1);
+}
+
+function resetRound() {
   gameOver = false;
   isAnimating = false;
   hoveredSlot = null;
+  remoteSelectedSlot = null;
   impactKick = 0;
+  fakeoutKick = 0;
   piratePop = 0;
-  currentPlayer = 0;
-  triggerSlot = Math.floor(Math.random() * slots.length);
+  matchFinished = false;
+  currentPlayer = roundStarter % players.length;
+  firedFakeouts.clear();
+  chooseTriggerSlots();
   resultCard.hidden = true;
-  document.body.classList.remove('is-failed');
-  hintLabel.textContent = '어두운 칼 구멍을 눌러보세요';
+  document.body.classList.remove('is-failed', 'is-fakeout');
+  hintLabel.textContent = `${players[currentPlayer].name}, 어두운 구멍을 선택하세요`;
   pirate.scale.setScalar(0.001);
-  pirate.position.set(0, CONTAINER_CONFIGS[containerStyle].height - 0.63, 0);
+  pirate.position.set(0, CONTAINER_CONFIGS[containerStyle].height - 0.6, 0);
   pirate.rotation.set(0, 0, 0);
   gameRoot.position.set(0, 0, 0);
   gameRoot.rotation.set(0, 0, 0);
-  swordRoot.clear();
-  insertedSwords.length = 0;
+  weaponRoot.clear();
+  insertedWeapons.length = 0;
+  particles.splice(0).forEach((particle) => effectsRoot.remove(particle));
   slots.forEach((slot) => {
     slot.userData.used = false;
     slot.userData.ring.material.color.setHex(0x46372d);
     slot.userData.ring.material.emissive.setHex(0x1e1208);
     slot.userData.ring.material.emissiveIntensity = 0.18;
     slot.userData.target.material.color.setHex(0x060303);
+    slot.userData.damage.clear();
+    slot.userData.damage.visible = false;
+    slot.userData.label.visible = Boolean(remoteConnection?.open);
   });
+  startTurnTimer();
+  updateTension();
   updateHud();
+  sendGameState();
+}
+
+function nextRound() {
+  if (matchFinished) {
+    players.forEach((player) => { player.score = 0; });
+    roundNumber = 1;
+    roundStarter = 0;
+  } else {
+    roundNumber += 1;
+    roundStarter = (roundStarter + 1) % players.length;
+  }
+  resetRound();
+}
+
+function renderScoreboard() {
+  scoreboard.innerHTML = players.map((player, index) => `
+    <div class="score-chip ${index === currentPlayer ? 'is-current' : ''}" style="--player-color:${player.css}">
+      <span class="score-chip__badge">P${index + 1}</span>
+      <strong>${escapeHtml(player.name)}</strong>
+      <strong>${player.score}</strong>
+    </div>
+  `).join('');
 }
 
 function updateHud() {
-  turnLabel.textContent = `플레이어 ${currentPlayer + 1}`;
+  const player = players[currentPlayer];
+  turnLabel.textContent = player.name;
   playerBadge.textContent = `P${currentPlayer + 1}`;
-  playerBadge.dataset.player = String(currentPlayer + 1);
-  swordCount.textContent = `${insertedSwords.length} / ${slots.length}`;
+  playerBadge.style.setProperty('--player-color', player.css);
+  roundLabel.textContent = `라운드 ${roundNumber} · ${MODE_CONFIGS[gameMode].name} · ${targetScore}점 승리`;
+  swordCount.textContent = `${insertedWeapons.length} / ${slots.length}`;
+  renderScoreboard();
 }
 
 function findSlotAtPointer(event) {
@@ -597,14 +1132,140 @@ function onPointerMove(event) {
   hoveredSlot = findSlotAtPointer(event);
   canvas.classList.toggle('is-aiming', Boolean(hoveredSlot));
   hintLabel.textContent = hoveredSlot
-    ? '조준 완료 — 클릭해서 칼을 꽂으세요'
+    ? `구멍 ${hoveredSlot.userData.slotIndex + 1} 조준 완료 — 클릭해서 꽂으세요`
     : '어두운 칼 구멍을 선택하세요';
 }
 
 function onPointerDown(event) {
-  if (resultCard.contains(event.target) || event.target.closest('button')) return;
+  if (event.target.closest('button, dialog')) return;
   const slot = findSlotAtPointer(event);
-  if (slot) insertSword(slot);
+  if (slot) insertWeapon(slot);
+}
+
+function renderPlayerNameFields() {
+  const count = Number(playerCountSelect.value);
+  const existingNames = [...playerNameFields.querySelectorAll('input')].map((input) => input.value);
+  playerNameFields.replaceChildren();
+  for (let index = 0; index < count; index += 1) {
+    const wrapper = document.createElement('label');
+    wrapper.className = 'player-name-field';
+    wrapper.style.setProperty('--player-color', PLAYER_COLORS[index].css);
+    const color = document.createElement('span');
+    const input = document.createElement('input');
+    input.maxLength = 12;
+    input.setAttribute('aria-label', `플레이어 ${index + 1} 이름`);
+    input.value = existingNames[index] || `플레이어 ${index + 1}`;
+    wrapper.append(color, input);
+    playerNameFields.append(wrapper);
+  }
+}
+
+function startConfiguredGame() {
+  const names = [...playerNameFields.querySelectorAll('input')].map((input, index) => input.value.trim() || `플레이어 ${index + 1}`);
+  players = names.map((name, index) => ({ name, score: 0, ...PLAYER_COLORS[index] }));
+  gameMode = modeButtons.find((button) => button.classList.contains('is-selected'))?.dataset.mode ?? 'classic';
+  targetScore = Number(targetButtons.find((button) => button.classList.contains('is-selected'))?.dataset.targetScore ?? 3);
+  roundNumber = 1;
+  roundStarter = 0;
+  settingsDialog.close();
+  resetRound();
+  showToast(`${players.length}명 · ${MODE_CONFIGS[gameMode].name} 시작!`);
+}
+
+function sendRemote(message) {
+  if (remoteConnection?.open) remoteConnection.send(message);
+}
+
+function gameState() {
+  return {
+    currentPlayerName: players[currentPlayer]?.name,
+    currentPlayer,
+    usedSlots: slots.filter((slot) => slot.userData.used).map((slot) => slot.userData.slotIndex),
+    tension: insertedWeapons.length / slots.length,
+    gameOver,
+    isAnimating,
+    swordStyle,
+  };
+}
+
+function sendGameState() {
+  sendRemote({ type: 'game-state', state: gameState() });
+}
+
+function handleRemoteMessage(message) {
+  if (!message?.type) return;
+  if (message.type === 'controller-ready') {
+    sendGameState();
+    return;
+  }
+  if (message.type === 'select-weapon') {
+    if (!WEAPON_NAMES[message.style]) return;
+    selectSword(message.style);
+    showToast(`휴대폰에서 ${WEAPON_NAMES[message.style]} 선택`);
+    return;
+  }
+  if (message.type === 'select-slot') {
+    const slot = slots[message.slotIndex];
+    if (!slot?.userData.used && !gameOver) {
+      remoteSelectedSlot = slot;
+      hintLabel.textContent = `원격 컨트롤러가 ${message.slotIndex + 1}번 구멍을 조준했습니다`;
+    }
+    return;
+  }
+  if (message.type === 'insert-slot') {
+    const slot = slots[message.slotIndex];
+    if (slot && !slot.userData.used) insertWeapon(slot);
+  }
+}
+
+async function initializeRemoteRoom() {
+  remoteDialog.showModal();
+  if (remotePeer && !remotePeer.destroyed) return;
+  remoteQr.hidden = true;
+  remoteLoading.hidden = false;
+  remoteStatus.textContent = '연결 대기';
+  remotePeer = new Peer(undefined, { debug: 1 });
+
+  remotePeer.on('open', async (peerId) => {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('controller', peerId);
+    remoteLink = url.toString();
+    copyRemoteLinkButton.dataset.link = remoteLink;
+    remoteQr.src = await QRCode.toDataURL(remoteLink, {
+      width: 420,
+      margin: 1,
+      color: { dark: '#07131fff', light: '#ffffffff' },
+    });
+    remoteQr.hidden = false;
+    remoteLoading.hidden = true;
+    remoteCode.textContent = peerId.slice(-6).toUpperCase();
+    copyRemoteLinkButton.disabled = false;
+  });
+
+  remotePeer.on('connection', (connection) => {
+    if (remoteConnection?.open) remoteConnection.close();
+    remoteConnection = connection;
+    connection.on('open', () => {
+      remoteStatus.textContent = '휴대폰 연결됨 ✓';
+      slots.forEach((slot) => { slot.userData.label.visible = true; });
+      showToast('휴대폰 컨트롤러가 연결되었습니다');
+      sendGameState();
+    });
+    connection.on('data', handleRemoteMessage);
+    connection.on('close', () => {
+      remoteStatus.textContent = '연결 종료 · 다시 스캔 가능';
+      remoteConnection = null;
+      remoteSelectedSlot = null;
+      slots.forEach((slot) => { slot.userData.label.visible = false; });
+    });
+  });
+
+  remotePeer.on('error', (error) => {
+    console.error(error);
+    remoteLoading.textContent = '방 생성에 실패했습니다. 다시 열어주세요.';
+    remoteStatus.textContent = '연결 오류';
+  });
 }
 
 function resize() {
@@ -615,96 +1276,174 @@ function resize() {
   renderer.setSize(width, height, false);
 }
 
+function updateTimer(time) {
+  if (!turnDeadline || gameOver) return;
+  const remaining = Math.max(0, (turnDeadline - time) / 1000);
+  turnTimer.textContent = remaining.toFixed(1);
+  turnTimer.classList.toggle('is-urgent', remaining <= 2.5);
+  const wholeSecond = Math.ceil(remaining);
+  if (remaining <= 3 && wholeSecond !== lastTimerSecond) {
+    lastTimerSecond = wholeSecond;
+    playTone(remaining <= 1 ? 680 : 480, 0.08, 'square', 0.035);
+  }
+  if (remaining <= 0 && !isAnimating) {
+    endRound({ loserIndex: currentPlayer, reason: '7초 안에 구멍을 고르지 못했습니다.' });
+  }
+}
+
 function animate(time) {
   const deltaTime = lastFrameTime ? Math.min(0.05, (time - lastFrameTime) * 0.001) : 0;
   lastFrameTime = time;
   elapsed = time * 0.001;
   controls.update();
+  updateTimer(time);
 
+  const tension = insertedWeapons.length / slots.length;
   slots.forEach((slot, index) => {
     if (slot.userData.used) return;
     const ring = slot.userData.ring;
     const isHovered = slot === hoveredSlot;
-    ring.material.color.setHex(isHovered ? 0xd7a43d : 0x46372d);
-    ring.material.emissive.setHex(isHovered ? 0x8b4900 : 0x1e1208);
-    ring.material.emissiveIntensity = isHovered
-      ? 0.85
-      : 0.16 + Math.sin(elapsed * 2.1 + index) * 0.06;
-    const scale = isHovered ? 1.16 : 1;
-    ring.scale.x += (scale - ring.scale.x) * 0.2;
-    ring.scale.y += (scale - ring.scale.y) * 0.2;
-    ring.scale.z += (scale - ring.scale.z) * 0.2;
+    const isRemote = slot === remoteSelectedSlot;
+    ring.material.color.setHex(isRemote ? 0x52e3a4 : isHovered ? 0xd7a43d : 0x46372d);
+    ring.material.emissive.setHex(isRemote ? 0x0cae69 : isHovered ? 0x8b4900 : 0x1e1208);
+    ring.material.emissiveIntensity = isRemote || isHovered
+      ? 0.9
+      : 0.16 + tension * 0.12 + Math.sin(elapsed * (2.1 + tension * 2) + index) * 0.06;
+    const scale = isRemote || isHovered ? 1.17 : 1;
+    ring.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.2);
   });
 
-  insertedSwords.forEach((sword) => {
-    if (sword.userData.progress < 1) {
-      const progress = Math.min(1, (elapsed - sword.userData.startedAt) / 0.62);
-      sword.userData.progress = progress;
-      let offset;
-      if (progress < 0.2) {
-        const pullback = progress / 0.2;
-        offset = THREE.MathUtils.lerp(-1.24, -1.42, 1 - (1 - pullback) ** 2);
-      } else if (progress < 0.82) {
-        const strike = (progress - 0.2) / 0.62;
-        offset = THREE.MathUtils.lerp(-1.42, 0.075, strike ** 3);
-      } else {
-        const settle = (progress - 0.82) / 0.18;
-        offset = THREE.MathUtils.lerp(0.075, 0, 1 - (1 - settle) ** 2);
-      }
-      sword.position.copy(sword.userData.target);
-      sword.translateZ(offset);
+  insertedWeapons.forEach((weapon) => {
+    if (weapon.userData.progress >= 1) return;
+    const progress = Math.min(1, (elapsed - weapon.userData.startedAt) / 0.66);
+    weapon.userData.progress = progress;
+    let offset;
+    if (progress < 0.2) {
+      const pullback = progress / 0.2;
+      offset = THREE.MathUtils.lerp(-1.24, -1.48, 1 - (1 - pullback) ** 2);
+    } else if (progress < 0.78) {
+      const strike = (progress - 0.2) / 0.58;
+      offset = THREE.MathUtils.lerp(-1.48, 0.09, strike ** 3);
+    } else {
+      const settle = (progress - 0.78) / 0.22;
+      offset = THREE.MathUtils.lerp(0.09, 0, 1 - (1 - settle) ** 2);
+    }
+    weapon.position.copy(weapon.userData.target);
+    weapon.translateZ(offset);
+    if (progress >= 0.78 && !weapon.userData.impacted) {
+      weapon.userData.impacted = true;
+      resolveWeaponImpact(weapon);
+    }
+    if (progress >= 1 && !gameOver) {
+      isAnimating = false;
+      sendGameState();
+    }
+  });
 
-      if (progress >= 0.82 && !sword.userData.impacted) {
-        sword.userData.impacted = true;
-        resolveSwordImpact(sword);
-      }
-      if (progress >= 1) isAnimating = false;
+  particles.forEach((particle, index) => {
+    particle.userData.life -= deltaTime;
+    particle.userData.velocity.y -= deltaTime * 0.8;
+    particle.position.addScaledVector(particle.userData.velocity, deltaTime);
+    particle.rotation.x += deltaTime * 8;
+    particle.rotation.z += deltaTime * 5;
+    if (particle.material.transparent) particle.material.opacity = Math.max(0, particle.userData.life / particle.userData.maxLife);
+    if (particle.userData.life <= 0) {
+      effectsRoot.remove(particle);
+      particles.splice(index, 1);
     }
   });
 
   impactKick = Math.max(0, impactKick - deltaTime * 4.8);
-  if (impactKick > 0) {
-    gameRoot.rotation.z = Math.sin(elapsed * 62) * impactKick * 0.022;
-    gameRoot.position.y = Math.abs(Math.sin(elapsed * 48)) * impactKick * 0.035;
+  fakeoutKick = Math.max(0, fakeoutKick - deltaTime * 1.7);
+  const totalKick = Math.max(impactKick, fakeoutKick * 0.72);
+  if (totalKick > 0) {
+    gameRoot.rotation.z = Math.sin(elapsed * (impactKick > 0 ? 62 : 24)) * totalKick * 0.025;
+    gameRoot.position.y = Math.abs(Math.sin(elapsed * 48)) * totalKick * 0.04;
+    camera.fov += ((38 + totalKick * 0.9) - camera.fov) * 0.18;
+    camera.updateProjectionMatrix();
   } else {
     gameRoot.rotation.z *= 0.7;
     gameRoot.position.y *= 0.7;
+    camera.fov += (38 - camera.fov) * 0.12;
+    camera.updateProjectionMatrix();
   }
 
+  const pirateBaseY = CONTAINER_CONFIGS[containerStyle].height - 0.6;
   if (gameOver) {
-    piratePop = Math.min(1, piratePop + deltaTime * 3.1);
+    piratePop = Math.min(1, piratePop + deltaTime * 2.7);
     const pop = 1 - (1 - piratePop) ** 3;
     const overshoot = piratePop < 0.7
       ? pop / 0.92
       : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
-    pirate.scale.setScalar(Math.max(0.001, overshoot));
-    const pirateBaseY = CONTAINER_CONFIGS[containerStyle].height - 0.63;
-    pirate.position.y = pirateBaseY + pop * 1.05 + Math.sin(piratePop * Math.PI) * 0.34;
-    pirate.rotation.y = Math.sin(elapsed * 9) * 0.14;
+    pirate.scale.setScalar(Math.max(0.001, overshoot * 0.78));
+    pirate.position.y = pirateBaseY + pop * 0.76 + Math.sin(piratePop * Math.PI) * 0.2;
+    pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
+    pirate.userData.leftArm.rotation.z = -0.22 + Math.sin(elapsed * 7) * 0.55;
+    pirate.userData.rightArm.rotation.z = 0.22 - Math.sin(elapsed * 7) * 0.55;
+  } else if (fakeoutKick > 0) {
+    const peek = Math.sin((1 - fakeoutKick) * Math.PI);
+    pirate.scale.setScalar(Math.max(0.001, peek * 0.34));
+    pirate.position.y = pirateBaseY + peek * 0.2;
+    pirate.rotation.y = Math.sin(elapsed * 8) * 0.22;
+  } else {
+    pirate.scale.setScalar(0.001);
+    pirate.position.y = pirateBaseY;
   }
 
+  pirate.userData.eye.material.emissiveIntensity = 0.65 + Math.sin(elapsed * 5) * 0.25;
+  pirate.userData.beard.rotation.z = Math.sin(elapsed * 3.5) * 0.04;
+  pirate.userData.hatCrown.rotation.y = Math.PI / 2 + Math.sin(elapsed * 2.7) * 0.03;
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
 
 buildSlots();
-resetGame();
+renderPlayerNameFields();
+resetRound();
 resize();
 window.addEventListener('resize', resize);
+window.addEventListener('beforeunload', () => remotePeer?.destroy());
 canvas.addEventListener('pointerdown', onPointerDown);
 canvas.addEventListener('pointermove', onPointerMove);
 canvas.addEventListener('pointerleave', () => {
   hoveredSlot = null;
   canvas.classList.remove('is-aiming');
 });
-containerButtons.forEach((button) => {
-  button.addEventListener('click', () => selectContainer(button.dataset.container));
+
+containerButtons.forEach((button) => button.addEventListener('click', () => selectContainer(button.dataset.container)));
+swordButtons.forEach((button) => button.addEventListener('click', () => selectSword(button.dataset.sword)));
+modeButtons.forEach((button) => button.addEventListener('click', () => {
+  modeButtons.forEach((candidate) => {
+    const selected = candidate === button;
+    candidate.classList.toggle('is-selected', selected);
+    candidate.setAttribute('aria-pressed', String(selected));
+  });
+}));
+targetButtons.forEach((button) => button.addEventListener('click', () => {
+  targetButtons.forEach((candidate) => {
+    const selected = candidate === button;
+    candidate.classList.toggle('is-selected', selected);
+    candidate.setAttribute('aria-pressed', String(selected));
+  });
+}));
+playerCountSelect.addEventListener('change', renderPlayerNameFields);
+$('#start-game-button').addEventListener('click', startConfiguredGame);
+$('#settings-button').addEventListener('click', () => {
+  turnDeadline = 0;
+  settingsDialog.showModal();
 });
-swordButtons.forEach((button) => {
-  button.addEventListener('click', () => selectSword(button.dataset.sword));
+$('#remote-button').addEventListener('click', initializeRemoteRoom);
+resultButton.addEventListener('click', nextRound);
+document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => {
+  document.getElementById(button.dataset.closeDialog)?.close();
+}));
+copyRemoteLinkButton.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(remoteLink);
+  showToast('휴대폰 연결 링크를 복사했습니다');
 });
-document.querySelector('#reset-button').addEventListener('click', resetGame);
-document.querySelector('#play-again-button').addEventListener('click', resetGame);
+settingsDialog.addEventListener('close', () => {
+  if (gameMode === 'speed' && !gameOver && !turnDeadline) startTurnTimer();
+});
 requestAnimationFrame(animate);
 
 const loader = new GLTFLoader();
@@ -722,7 +1461,6 @@ loader.load(
       object.castShadow = true;
       object.receiveShadow = true;
     });
-
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const scale = CONTAINER_CONFIGS.wood.height / size.y;
