@@ -50,6 +50,11 @@ button {
   cursor: grabbing;
 }
 
+#game-canvas.is-aiming,
+#game-canvas.is-aiming:active {
+  cursor: crosshair;
+}
+
 .hud {
   position: fixed;
   z-index: 5;

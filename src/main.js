@@ -68,19 +68,40 @@ tableRim.rotation.x = Math.PI / 2;
 tableRim.position.y = -0.08;
 scene.add(tableRim);
 
+const gameRoot = new THREE.Group();
+scene.add(gameRoot);
+
 const barrelRoot = new THREE.Group();
-scene.add(barrelRoot);
+gameRoot.add(barrelRoot);
 
 const slotRoot = new THREE.Group();
-scene.add(slotRoot);
+gameRoot.add(slotRoot);
 
 const swordRoot = new THREE.Group();
-scene.add(swordRoot);
+gameRoot.add(swordRoot);
+
+const openingRoot = new THREE.Group();
+const opening = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.57, 0.57, 0.035, 48),
+  new THREE.MeshStandardMaterial({ color: 0x090606, roughness: 0.96 }),
+);
+opening.position.y = 2.91;
+opening.receiveShadow = true;
+openingRoot.add(opening);
+
+const openingRim = new THREE.Mesh(
+  new THREE.TorusGeometry(0.57, 0.045, 10, 48),
+  new THREE.MeshStandardMaterial({ color: 0x171310, metalness: 0.82, roughness: 0.38 }),
+);
+openingRim.rotation.x = Math.PI / 2;
+openingRim.position.y = 2.935;
+openingRoot.add(openingRim);
+gameRoot.add(openingRoot);
 
 const pirate = createPiratePlaceholder();
-pirate.position.set(0, 1.82, 0);
+pirate.position.set(0, 2.28, 0);
 pirate.scale.setScalar(0.001);
-scene.add(pirate);
+gameRoot.add(pirate);
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -89,7 +110,12 @@ const insertedSwords = [];
 let triggerSlot = 0;
 let currentPlayer = 0;
 let gameOver = false;
+let isAnimating = false;
+let hoveredSlot = null;
+let impactKick = 0;
+let piratePop = 0;
 let elapsed = 0;
+let lastFrameTime = 0;
 
 function createPiratePlaceholder() {
   const root = new THREE.Group();
@@ -123,39 +149,60 @@ function buildSlots() {
   slotRoot.clear();
   slots.length = 0;
 
-  const rows = [0.7, 1.35, 2.0];
+  const rows = [0.72, 1.43, 2.14];
   const counts = [5, 6, 5];
   let index = 0;
   rows.forEach((height, rowIndex) => {
     for (let i = 0; i < counts[rowIndex]; i += 1) {
       const angle = (i / counts[rowIndex]) * Math.PI * 2 + rowIndex * 0.34;
-      const radius = 1.47 - Math.abs(height - 1.35) * 0.13;
+      const normalizedHeight = Math.abs(height - 1.43) / 1.43;
+      const radius = 1.285 - normalizedHeight * normalizedHeight * 0.18;
       const group = new THREE.Group();
       group.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
       group.lookAt(0, height, 0);
       group.userData = { slotIndex: index, used: false };
 
       const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(0.15, 0.045, 10, 24),
+        new THREE.TorusGeometry(0.115, 0.021, 10, 28),
         new THREE.MeshStandardMaterial({
-          color: 0xf4c95d,
-          emissive: 0x8b4900,
-          emissiveIntensity: 0.7,
-          metalness: 0.72,
-          roughness: 0.28,
+          color: 0x46372d,
+          emissive: 0x1e1208,
+          emissiveIntensity: 0.18,
+          metalness: 0.76,
+          roughness: 0.42,
         }),
       );
-      ring.rotation.x = Math.PI / 2;
+      ring.position.z = -0.025;
       ring.userData.slotGroup = group;
       group.add(ring);
 
       const target = new THREE.Mesh(
-        new THREE.CircleGeometry(0.115, 20),
-        new THREE.MeshBasicMaterial({ color: 0x120807, side: THREE.DoubleSide }),
+        new THREE.CircleGeometry(0.098, 24),
+        new THREE.MeshStandardMaterial({
+          color: 0x060303,
+          roughness: 1,
+          side: THREE.DoubleSide,
+        }),
       );
-      target.position.z = 0.008;
+      target.position.z = -0.021;
       target.userData.slotGroup = group;
       group.add(target);
+
+      const hitArea = new THREE.Mesh(
+        new THREE.CircleGeometry(0.19, 20),
+        new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      hitArea.position.z = -0.055;
+      hitArea.userData.slotGroup = group;
+      group.add(hitArea);
+
+      group.userData.ring = ring;
+      group.userData.target = target;
 
       slotRoot.add(group);
       slots.push(group);
@@ -164,36 +211,62 @@ function buildSlots() {
   });
 }
 
-function createSword(slot) {
+function createSword(slot, player) {
   const sword = new THREE.Group();
   sword.position.copy(slot.position);
   sword.quaternion.copy(slot.quaternion);
-  sword.translateZ(1.15);
+  sword.rotateZ(player === 0 ? -0.12 : 0.12);
+  sword.translateZ(-1.24);
   sword.userData.target = slot.position.clone();
   sword.userData.progress = 0;
+  sword.userData.impacted = false;
+  sword.userData.player = player;
+  sword.userData.slot = slot;
+  sword.userData.startedAt = elapsed;
 
   const blade = new THREE.Mesh(
-    new THREE.BoxGeometry(0.095, 0.055, 1.5),
-    new THREE.MeshStandardMaterial({ color: 0xcde7eb, metalness: 0.92, roughness: 0.18 }),
+    new THREE.BoxGeometry(0.105, 0.045, 0.96),
+    new THREE.MeshStandardMaterial({ color: 0xdaf3f3, metalness: 0.94, roughness: 0.14 }),
   );
-  blade.position.z = 0.52;
+  blade.position.z = 0.25;
   blade.castShadow = true;
   sword.add(blade);
 
+  const tip = new THREE.Mesh(
+    new THREE.ConeGeometry(0.072, 0.24, 4),
+    new THREE.MeshStandardMaterial({ color: 0xe8ffff, metalness: 0.94, roughness: 0.12 }),
+  );
+  tip.rotation.x = Math.PI / 2;
+  tip.rotation.y = Math.PI / 4;
+  tip.position.z = 0.85;
+  tip.castShadow = true;
+  sword.add(tip);
+
   const guard = new THREE.Mesh(
-    new THREE.BoxGeometry(0.65, 0.13, 0.13),
+    new THREE.BoxGeometry(0.48, 0.11, 0.11),
     new THREE.MeshStandardMaterial({ color: 0xf0b83d, metalness: 0.8, roughness: 0.25 }),
   );
-  guard.position.z = 1.2;
+  guard.position.z = -0.27;
+  guard.castShadow = true;
   sword.add(guard);
 
+  const gripColor = player === 0 ? 0x36cde2 : 0xff685f;
   const handle = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.09, 0.09, 0.42, 12),
-    new THREE.MeshStandardMaterial({ color: 0x3e1a13, roughness: 0.85 }),
+    new THREE.CylinderGeometry(0.075, 0.075, 0.4, 12),
+    new THREE.MeshStandardMaterial({ color: gripColor, roughness: 0.56, metalness: 0.08 }),
   );
   handle.rotation.x = Math.PI / 2;
-  handle.position.z = 1.45;
+  handle.position.z = -0.5;
+  handle.castShadow = true;
   sword.add(handle);
+
+  const pommel = new THREE.Mesh(
+    new THREE.SphereGeometry(0.105, 14, 10),
+    new THREE.MeshStandardMaterial({ color: 0xe4ad32, metalness: 0.78, roughness: 0.28 }),
+  );
+  pommel.position.z = -0.73;
+  pommel.castShadow = true;
+  sword.add(pommel);
   return sword;
 }
 
@@ -213,23 +286,40 @@ function playTone(frequency, duration, type = 'sine') {
 }
 
 function insertSword(slot) {
-  if (gameOver || slot.userData.used) return;
+  if (gameOver || isAnimating || slot.userData.used) return;
+  isAnimating = true;
   slot.userData.used = true;
-  slot.children.forEach((child) => {
-    if (child.material) child.material.opacity = 0.2;
-  });
+  hoveredSlot = null;
+  canvas.classList.remove('is-aiming');
+  hintLabel.textContent = '칼을 힘껏 꽂는 중…';
 
-  const sword = createSword(slot);
+  const sword = createSword(slot, currentPlayer);
   swordRoot.add(sword);
   insertedSwords.push(sword);
-  playTone(170, 0.18, 'square');
+  playTone(340, 0.09, 'triangle');
+}
+
+function resolveSwordImpact(sword) {
+  const { slot, player } = sword.userData;
+  impactKick = 1;
+  slot.userData.ring.material.color.setHex(0x251a14);
+  slot.userData.ring.material.emissive.setHex(0x080402);
+  slot.userData.ring.material.emissiveIntensity = 0.05;
+  slot.userData.target.material.color.setHex(0x020101);
+  playTone(105, 0.22, 'square');
+  window.setTimeout(() => playTone(62, 0.28, 'sine'), 55);
+  updateHud();
 
   if (slot.userData.slotIndex === triggerSlot) {
     gameOver = true;
-    window.setTimeout(() => triggerPirate(), 430);
+    currentPlayer = player;
+    window.setTimeout(() => triggerPirate(), 190);
   } else {
-    currentPlayer = (currentPlayer + 1) % 2;
-    updateHud();
+    currentPlayer = (player + 1) % 2;
+    window.setTimeout(() => {
+      hintLabel.textContent = '다음 플레이어, 구멍을 선택하세요';
+      updateHud();
+    }, 170);
   }
 }
 
@@ -243,20 +333,28 @@ function triggerPirate() {
 
 function resetGame() {
   gameOver = false;
+  isAnimating = false;
+  hoveredSlot = null;
+  impactKick = 0;
+  piratePop = 0;
   currentPlayer = 0;
   triggerSlot = Math.floor(Math.random() * slots.length);
   resultCard.hidden = true;
   document.body.classList.remove('is-failed');
-  hintLabel.textContent = '빛나는 슬롯을 눌러 칼을 꽂으세요';
+  hintLabel.textContent = '어두운 칼 구멍을 눌러보세요';
   pirate.scale.setScalar(0.001);
-  pirate.position.y = 1.82;
+  pirate.position.set(0, 2.28, 0);
+  pirate.rotation.set(0, 0, 0);
+  gameRoot.position.set(0, 0, 0);
+  gameRoot.rotation.set(0, 0, 0);
   swordRoot.clear();
   insertedSwords.length = 0;
   slots.forEach((slot) => {
     slot.userData.used = false;
-    slot.children.forEach((child) => {
-      if (child.material) child.material.opacity = 1;
-    });
+    slot.userData.ring.material.color.setHex(0x46372d);
+    slot.userData.ring.material.emissive.setHex(0x1e1208);
+    slot.userData.ring.material.emissiveIntensity = 0.18;
+    slot.userData.target.material.color.setHex(0x060303);
   });
   updateHud();
 }
@@ -268,17 +366,28 @@ function updateHud() {
   swordCount.textContent = `${insertedSwords.length} / ${slots.length}`;
 }
 
-function onPointerDown(event) {
-  if (resultCard.contains(event.target) || event.target.closest('button')) return;
+function findSlotAtPointer(event) {
   const rect = canvas.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
   const intersections = raycaster.intersectObjects(slotRoot.children, true);
-  if (intersections.length) {
-    const slot = intersections[0].object.userData.slotGroup;
-    if (slot) insertSword(slot);
-  }
+  return intersections.find((hit) => !hit.object.userData.slotGroup?.userData.used)?.object.userData.slotGroup ?? null;
+}
+
+function onPointerMove(event) {
+  if (gameOver || isAnimating) return;
+  hoveredSlot = findSlotAtPointer(event);
+  canvas.classList.toggle('is-aiming', Boolean(hoveredSlot));
+  hintLabel.textContent = hoveredSlot
+    ? '조준 완료 — 클릭해서 칼을 꽂으세요'
+    : '어두운 칼 구멍을 선택하세요';
+}
+
+function onPointerDown(event) {
+  if (resultCard.contains(event.target) || event.target.closest('button')) return;
+  const slot = findSlotAtPointer(event);
+  if (slot) insertSword(slot);
 }
 
 function resize() {
@@ -290,29 +399,69 @@ function resize() {
 }
 
 function animate(time) {
+  const deltaTime = lastFrameTime ? Math.min(0.05, (time - lastFrameTime) * 0.001) : 0;
+  lastFrameTime = time;
   elapsed = time * 0.001;
   controls.update();
 
   slots.forEach((slot, index) => {
     if (slot.userData.used) return;
-    const ring = slot.children[0];
-    ring.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 2.4 + index) * 0.22;
+    const ring = slot.userData.ring;
+    const isHovered = slot === hoveredSlot;
+    ring.material.color.setHex(isHovered ? 0xd7a43d : 0x46372d);
+    ring.material.emissive.setHex(isHovered ? 0x8b4900 : 0x1e1208);
+    ring.material.emissiveIntensity = isHovered
+      ? 0.85
+      : 0.16 + Math.sin(elapsed * 2.1 + index) * 0.06;
+    const scale = isHovered ? 1.16 : 1;
+    ring.scale.x += (scale - ring.scale.x) * 0.2;
+    ring.scale.y += (scale - ring.scale.y) * 0.2;
+    ring.scale.z += (scale - ring.scale.z) * 0.2;
   });
 
   insertedSwords.forEach((sword) => {
     if (sword.userData.progress < 1) {
-      sword.userData.progress = Math.min(1, sword.userData.progress + 0.07);
-      const eased = 1 - (1 - sword.userData.progress) ** 3;
+      const progress = Math.min(1, (elapsed - sword.userData.startedAt) / 0.62);
+      sword.userData.progress = progress;
+      let offset;
+      if (progress < 0.2) {
+        const pullback = progress / 0.2;
+        offset = THREE.MathUtils.lerp(-1.24, -1.42, 1 - (1 - pullback) ** 2);
+      } else if (progress < 0.82) {
+        const strike = (progress - 0.2) / 0.62;
+        offset = THREE.MathUtils.lerp(-1.42, 0.075, strike ** 3);
+      } else {
+        const settle = (progress - 0.82) / 0.18;
+        offset = THREE.MathUtils.lerp(0.075, 0, 1 - (1 - settle) ** 2);
+      }
       sword.position.copy(sword.userData.target);
-      sword.translateZ(1.15 * (1 - eased));
+      sword.translateZ(offset);
+
+      if (progress >= 0.82 && !sword.userData.impacted) {
+        sword.userData.impacted = true;
+        resolveSwordImpact(sword);
+      }
+      if (progress >= 1) isAnimating = false;
     }
   });
 
+  impactKick = Math.max(0, impactKick - deltaTime * 4.8);
+  if (impactKick > 0) {
+    gameRoot.rotation.z = Math.sin(elapsed * 62) * impactKick * 0.022;
+    gameRoot.position.y = Math.abs(Math.sin(elapsed * 48)) * impactKick * 0.035;
+  } else {
+    gameRoot.rotation.z *= 0.7;
+    gameRoot.position.y *= 0.7;
+  }
+
   if (gameOver) {
-    const pop = Math.min(1, pirate.scale.x + 0.075);
-    const overshoot = pop < 0.75 ? pop / 0.75 : 1 + Math.sin((pop - 0.75) * Math.PI * 4) * 0.08;
+    piratePop = Math.min(1, piratePop + deltaTime * 3.1);
+    const pop = 1 - (1 - piratePop) ** 3;
+    const overshoot = piratePop < 0.7
+      ? pop / 0.92
+      : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
     pirate.scale.setScalar(Math.max(0.001, overshoot));
-    pirate.position.y = 1.82 + Math.sin(Math.min(1, pop) * Math.PI) * 1.15;
+    pirate.position.y = 2.28 + pop * 1.05 + Math.sin(piratePop * Math.PI) * 0.34;
     pirate.rotation.y = Math.sin(elapsed * 9) * 0.14;
   }
 
@@ -325,6 +474,11 @@ resetGame();
 resize();
 window.addEventListener('resize', resize);
 canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('pointerleave', () => {
+  hoveredSlot = null;
+  canvas.classList.remove('is-aiming');
+});
 document.querySelector('#reset-button').addEventListener('click', resetGame);
 document.querySelector('#play-again-button').addEventListener('click', resetGame);
 requestAnimationFrame(animate);
