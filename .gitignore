@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+output/playwright/
+.playwright-cli/
+.playwright-mcp/
+public/assets/models/*-preview.glb
+source-assets/
+public/assets/models/barrel_textures/

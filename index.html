@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#091a2a" />
+    <title>크라켄의 술통</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏴‍☠️</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="game-canvas" aria-label="크라켄의 술통 3D 게임"></canvas>
+
+      <header class="hud hud--top">
+        <div class="brand">
+          <span class="brand__eyebrow">PIRATE PARTY GAME</span>
+          <h1>크라켄의 술통</h1>
+        </div>
+        <button id="reset-button" class="icon-button" type="button">새 게임</button>
+      </header>
+
+      <section class="turn-card" aria-live="polite">
+        <div id="player-badge" class="player-badge">P1</div>
+        <div>
+          <span class="turn-card__label">현재 차례</span>
+          <strong id="turn-label">플레이어 1</strong>
+        </div>
+        <span id="sword-count" class="sword-count">0 / 16</span>
+      </section>
+
+      <section class="hint-card">
+        <span class="hint-card__dot"></span>
+        <p id="hint-label">빛나는 슬롯을 눌러 칼을 꽂으세요</p>
+      </section>
+
+      <section id="result-card" class="result-card" hidden>
+        <span class="result-card__eyebrow">KRAKEN!</span>
+        <h2 id="result-title">플레이어 1 패배</h2>
+        <p>저주받은 슬롯을 찾았습니다.</p>
+        <button id="play-again-button" type="button">한 판 더</button>
+      </section>
+
+      <div id="loading" class="loading">
+        <div class="loading__spinner"></div>
+        <strong>Meshy 오크통 불러오는 중</strong>
+        <span id="loading-progress">0%</span>
+      </div>
+
+      <footer class="footer-note">드래그해서 회전 · 스크롤해서 확대</footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
