@@ -26,11 +26,11 @@ const CONTAINER_CONFIGS = {
     },
   },
   drum: {
-    height: 3.28,
-    rows: [0.8, 1.64, 2.48],
-    openingRadius: 0.63,
+    height: 3.72,
+    rows: [0.92, 1.84, 2.76],
+    openingRadius: 0.61,
     radiusAt() {
-      return 1.505;
+      return 1.365;
     },
   },
 };
@@ -148,45 +148,62 @@ let lastFrameTime = 0;
 
 function createDrumContainer() {
   const root = new THREE.Group();
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0x277483,
-    metalness: 0.62,
-    roughness: 0.38,
+  const bodyMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x075ca8,
+    metalness: 0.82,
+    roughness: 0.2,
+    clearcoat: 0.72,
+    clearcoatRoughness: 0.13,
   });
-  const darkMetal = new THREE.MeshStandardMaterial({
-    color: 0x17343b,
-    metalness: 0.84,
-    roughness: 0.26,
+  const edgeMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x0870c5,
+    metalness: 0.9,
+    roughness: 0.16,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.1,
   });
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.48, 1.48, 3.28, 64), bodyMaterial);
-  body.position.y = 1.64;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.34, 1.34, 3.64, 96), bodyMaterial);
+  body.position.y = 1.86;
   body.castShadow = true;
   body.receiveShadow = true;
   root.add(body);
 
-  [0.15, 0.56, 2.72, 3.13].forEach((height) => {
-    const rib = new THREE.Mesh(new THREE.TorusGeometry(1.49, 0.065, 10, 64), darkMetal);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(1.305, 1.305, 0.065, 96), bodyMaterial);
+  lid.position.y = 3.675;
+  lid.castShadow = true;
+  lid.receiveShadow = true;
+  root.add(lid);
+
+  [0.075, 3.645].forEach((height) => {
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.355, 0.06, 12, 96), edgeMaterial);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = height;
+    rim.castShadow = true;
+    root.add(rim);
+  });
+
+  [1.24, 2.48].forEach((height) => {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.045, 10, 96), edgeMaterial);
     rib.rotation.x = Math.PI / 2;
     rib.position.y = height;
     rib.castShadow = true;
     root.add(rib);
   });
 
-  [1.02, 2.26].forEach((height) => {
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.505, 1.505, 0.11, 64), darkMetal);
-    band.position.y = height;
-    band.castShadow = true;
-    root.add(band);
-  });
-
-  const label = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.72, 0.28),
-    new THREE.MeshStandardMaterial({ color: 0xe0b953, roughness: 0.66 }),
+  const bung = new THREE.Group();
+  bung.position.set(0.76, 3.73, 0.7);
+  const bungBase = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.055, 24), edgeMaterial);
+  bungBase.castShadow = true;
+  bung.add(bungBase);
+  const bungInset = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.105, 0.105, 0.06, 20),
+    new THREE.MeshStandardMaterial({ color: 0x183e5f, metalness: 0.9, roughness: 0.3 }),
   );
-  label.position.set(0, 1.64, 1.486);
-  label.castShadow = true;
-  root.add(label);
+  bungInset.position.y = 0.035;
+  bungInset.castShadow = true;
+  bung.add(bungInset);
+  root.add(bung);
   return root;
 }
 
@@ -325,37 +342,50 @@ function selectSword(style) {
     button.classList.toggle('is-selected', selected);
     button.setAttribute('aria-pressed', String(selected));
   });
-  const names = { classic: '클래식 칼', cutlass: '해적 커틀러스', dagger: '보석 단검' };
+  const names = { classic: '선장 해적검', cutlass: 'D가드 커틀러스', dagger: '크라켄 단검' };
   hintLabel.textContent = `${names[style]} 선택 — 다음 구멍을 노리세요`;
 }
 
 function createShapedBlade(style, material) {
   const shape = new THREE.Shape();
   if (style === 'cutlass') {
-    shape.moveTo(-0.11, -0.2);
-    shape.quadraticCurveTo(-0.18, 0.48, 0.06, 1.08);
-    shape.lineTo(0.14, 0.92);
-    shape.quadraticCurveTo(0.01, 0.42, 0.05, -0.2);
+    shape.moveTo(-0.12, -0.2);
+    shape.quadraticCurveTo(-0.2, 0.45, 0.08, 1.12);
+    shape.quadraticCurveTo(0.18, 1.03, 0.2, 0.91);
+    shape.quadraticCurveTo(0.02, 0.4, 0.06, -0.2);
+  } else if (style === 'dagger') {
+    shape.moveTo(-0.14, -0.2);
+    shape.lineTo(-0.23, 0.2);
+    shape.quadraticCurveTo(-0.22, 0.6, 0, 1.04);
+    shape.quadraticCurveTo(0.22, 0.6, 0.23, 0.2);
+    shape.lineTo(0.14, -0.2);
   } else {
-    shape.moveTo(-0.18, -0.18);
-    shape.lineTo(-0.2, 0.24);
-    shape.lineTo(0, 0.98);
-    shape.lineTo(0.2, 0.24);
-    shape.lineTo(0.18, -0.18);
+    shape.moveTo(-0.115, -0.2);
+    shape.lineTo(-0.14, 0.68);
+    shape.lineTo(0, 1.12);
+    shape.lineTo(0.14, 0.68);
+    shape.lineTo(0.115, -0.2);
   }
   shape.closePath();
 
   const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: style === 'dagger' ? 0.055 : 0.045,
+    depth: style === 'dagger' ? 0.07 : 0.05,
     bevelEnabled: true,
-    bevelSegments: 1,
-    bevelSize: 0.012,
-    bevelThickness: 0.01,
+    bevelSegments: 2,
+    bevelSize: 0.016,
+    bevelThickness: 0.012,
   });
   geometry.rotateX(Math.PI / 2);
   const blade = new THREE.Mesh(geometry, material);
   blade.castShadow = true;
   return blade;
+}
+
+function createCurvedGuard(points, material, radius = 0.025) {
+  const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  const guard = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, radius, 7, false), material);
+  guard.castShadow = true;
+  return guard;
 }
 
 function createSword(slot, player) {
@@ -374,74 +404,84 @@ function createSword(slot, player) {
   sword.userData.startedAt = elapsed;
   sword.userData.design = design;
 
-  const bladeMaterial = new THREE.MeshStandardMaterial({
-    color: design === 'dagger' ? 0xc9efff : 0xdaf3f3,
+  const bladeMaterial = new THREE.MeshPhysicalMaterial({
+    color: design === 'dagger' ? 0xbfeaff : 0xe4f6f7,
     metalness: 0.94,
-    roughness: 0.14,
+    roughness: 0.12,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.08,
+  });
+  sword.add(createShapedBlade(design, bladeMaterial));
+
+  const guardMaterial = new THREE.MeshPhysicalMaterial({
+    color: design === 'dagger' ? 0x8fd9ec : design === 'cutlass' ? 0xd89d2d : 0xe8b33f,
+    metalness: 0.88,
+    roughness: 0.22,
+    clearcoat: 0.35,
   });
   if (design === 'classic') {
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.045, 0.96), bladeMaterial);
-    blade.position.z = 0.25;
-    blade.castShadow = true;
-    sword.add(blade);
-
-    const tip = new THREE.Mesh(
-      new THREE.ConeGeometry(0.072, 0.24, 4),
-      new THREE.MeshStandardMaterial({ color: 0xe8ffff, metalness: 0.94, roughness: 0.12 }),
-    );
-    tip.rotation.x = Math.PI / 2;
-    tip.rotation.y = Math.PI / 4;
-    tip.position.z = 0.85;
-    tip.castShadow = true;
-    sword.add(tip);
+    sword.add(createCurvedGuard([
+      [-0.34, 0, -0.22], [-0.2, 0.025, -0.26], [0, 0, -0.27],
+      [0.2, -0.025, -0.26], [0.34, 0, -0.22],
+    ], guardMaterial, 0.034));
+    [-1, 1].forEach((side) => {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), guardMaterial);
+      cap.position.set(side * 0.34, 0, -0.22);
+      sword.add(cap);
+    });
+  } else if (design === 'cutlass') {
+    sword.add(createCurvedGuard([
+      [-0.27, 0, -0.22], [-0.42, 0.02, -0.38], [-0.4, 0.01, -0.64],
+      [-0.24, 0, -0.83], [-0.04, 0, -0.82],
+    ], guardMaterial, 0.033));
+    sword.add(createCurvedGuard([
+      [-0.27, 0, -0.22], [-0.08, 0.035, -0.27], [0.18, 0, -0.25],
+    ], guardMaterial, 0.038));
   } else {
-    sword.add(createShapedBlade(design, bladeMaterial));
-  }
-
-  const guardWidth = design === 'dagger' ? 0.64 : design === 'cutlass' ? 0.38 : 0.48;
-  const guard = new THREE.Mesh(
-    new THREE.BoxGeometry(guardWidth, 0.11, 0.11),
-    new THREE.MeshStandardMaterial({ color: 0xf0b83d, metalness: 0.8, roughness: 0.25 }),
-  );
-  guard.position.z = -0.27;
-  guard.castShadow = true;
-  sword.add(guard);
-
-  if (design === 'cutlass') {
-    const basket = new THREE.Mesh(
-      new THREE.TorusGeometry(0.19, 0.028, 8, 24, Math.PI * 1.25),
-      new THREE.MeshStandardMaterial({ color: 0xe2a72d, metalness: 0.83, roughness: 0.26 }),
-    );
-    basket.rotation.z = -0.42;
-    basket.position.z = -0.42;
-    basket.castShadow = true;
-    sword.add(basket);
+    sword.add(createCurvedGuard([
+      [0, 0, -0.26], [-0.2, 0.04, -0.3], [-0.35, -0.02, -0.22], [-0.3, -0.01, -0.1],
+    ], guardMaterial, 0.032));
+    sword.add(createCurvedGuard([
+      [0, 0, -0.26], [0.2, -0.04, -0.3], [0.35, 0.02, -0.22], [0.3, 0.01, -0.1],
+    ], guardMaterial, 0.032));
   }
 
   const gripColor = player === 0 ? 0x36cde2 : 0xff685f;
-  const gripLength = design === 'cutlass' ? 0.48 : design === 'dagger' ? 0.32 : 0.4;
+  const gripLength = design === 'cutlass' ? 0.48 : design === 'dagger' ? 0.38 : 0.42;
   const handle = new THREE.Mesh(
     new THREE.CylinderGeometry(0.075, 0.075, gripLength, 12),
     new THREE.MeshStandardMaterial({ color: gripColor, roughness: 0.56, metalness: 0.08 }),
   );
   handle.rotation.x = Math.PI / 2;
-  handle.position.z = design === 'cutlass' ? -0.54 : design === 'dagger' ? -0.45 : -0.5;
+  handle.position.z = design === 'cutlass' ? -0.55 : design === 'dagger' ? -0.48 : -0.51;
   handle.castShadow = true;
   sword.add(handle);
+
+  const wrapMaterial = new THREE.MeshStandardMaterial({
+    color: player === 0 ? 0x0c6578 : 0x8c282d,
+    metalness: 0.18,
+    roughness: 0.48,
+  });
+  const wrapCenter = handle.position.z;
+  for (let i = -2; i <= 2; i += 1) {
+    const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.009, 6, 14), wrapMaterial);
+    wrap.position.z = wrapCenter + i * (gripLength * 0.18);
+    sword.add(wrap);
+  }
 
   const pommel = new THREE.Mesh(
     design === 'dagger'
       ? new THREE.OctahedronGeometry(0.12)
       : new THREE.SphereGeometry(0.105, 14, 10),
     new THREE.MeshStandardMaterial({
-      color: design === 'dagger' ? 0x9e66ff : 0xe4ad32,
-      emissive: design === 'dagger' ? 0x2f0f72 : 0x000000,
-      emissiveIntensity: design === 'dagger' ? 0.55 : 0,
+      color: design === 'dagger' ? 0x37d9e6 : 0xe4ad32,
+      emissive: design === 'dagger' ? 0x063e65 : 0x000000,
+      emissiveIntensity: design === 'dagger' ? 0.7 : 0,
       metalness: 0.78,
       roughness: 0.28,
     }),
   );
-  pommel.position.z = design === 'cutlass' ? -0.82 : design === 'dagger' ? -0.66 : -0.73;
+  pommel.position.z = design === 'cutlass' ? -0.83 : design === 'dagger' ? -0.7 : -0.75;
   pommel.castShadow = true;
   sword.add(pommel);
   return sword;
