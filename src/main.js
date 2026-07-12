@@ -12,6 +12,31 @@ const swordCount = document.querySelector('#sword-count');
 const hintLabel = document.querySelector('#hint-label');
 const resultCard = document.querySelector('#result-card');
 const resultTitle = document.querySelector('#result-title');
+const containerButtons = [...document.querySelectorAll('[data-container]')];
+const swordButtons = [...document.querySelectorAll('[data-sword]')];
+
+const CONTAINER_CONFIGS = {
+  wood: {
+    height: 3.4,
+    rows: [0.84, 1.68, 2.52],
+    openingRadius: 0.66,
+    radiusAt(height) {
+      const normalizedHeight = Math.abs(height - 1.7) / 1.7;
+      return 1.5 - normalizedHeight * normalizedHeight * 0.2;
+    },
+  },
+  drum: {
+    height: 3.28,
+    rows: [0.8, 1.64, 2.48],
+    openingRadius: 0.63,
+    radiusAt() {
+      return 1.505;
+    },
+  },
+};
+
+let containerStyle = 'wood';
+let swordStyle = 'classic';
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x091726, 0.045);
@@ -74,6 +99,10 @@ scene.add(gameRoot);
 const barrelRoot = new THREE.Group();
 gameRoot.add(barrelRoot);
 
+const drumRoot = createDrumContainer();
+drumRoot.visible = false;
+gameRoot.add(drumRoot);
+
 const slotRoot = new THREE.Group();
 gameRoot.add(slotRoot);
 
@@ -117,6 +146,50 @@ let piratePop = 0;
 let elapsed = 0;
 let lastFrameTime = 0;
 
+function createDrumContainer() {
+  const root = new THREE.Group();
+  const bodyMaterial = new THREE.MeshStandardMaterial({
+    color: 0x277483,
+    metalness: 0.62,
+    roughness: 0.38,
+  });
+  const darkMetal = new THREE.MeshStandardMaterial({
+    color: 0x17343b,
+    metalness: 0.84,
+    roughness: 0.26,
+  });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.48, 1.48, 3.28, 64), bodyMaterial);
+  body.position.y = 1.64;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  root.add(body);
+
+  [0.15, 0.56, 2.72, 3.13].forEach((height) => {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(1.49, 0.065, 10, 64), darkMetal);
+    rib.rotation.x = Math.PI / 2;
+    rib.position.y = height;
+    rib.castShadow = true;
+    root.add(rib);
+  });
+
+  [1.02, 2.26].forEach((height) => {
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.505, 1.505, 0.11, 64), darkMetal);
+    band.position.y = height;
+    band.castShadow = true;
+    root.add(band);
+  });
+
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.72, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0xe0b953, roughness: 0.66 }),
+  );
+  label.position.set(0, 1.64, 1.486);
+  label.castShadow = true;
+  root.add(label);
+  return root;
+}
+
 function createPiratePlaceholder() {
   const root = new THREE.Group();
   const coat = new THREE.Mesh(
@@ -149,18 +222,14 @@ function buildSlots() {
   slotRoot.clear();
   slots.length = 0;
 
-  const rows = [0.72, 1.43, 2.14];
+  const rows = [0, 1, 2];
   const counts = [5, 6, 5];
   let index = 0;
-  rows.forEach((height, rowIndex) => {
+  rows.forEach((_, rowIndex) => {
     for (let i = 0; i < counts[rowIndex]; i += 1) {
       const angle = (i / counts[rowIndex]) * Math.PI * 2 + rowIndex * 0.34;
-      const normalizedHeight = Math.abs(height - 1.43) / 1.43;
-      const radius = 1.285 - normalizedHeight * normalizedHeight * 0.18;
       const group = new THREE.Group();
-      group.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
-      group.lookAt(0, height, 0);
-      group.userData = { slotIndex: index, used: false };
+      group.userData = { slotIndex: index, rowIndex, angle, used: false };
 
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(0.115, 0.021, 10, 28),
@@ -209,13 +278,93 @@ function buildSlots() {
       index += 1;
     }
   });
+  updateContainerLayout();
+}
+
+function updateContainerLayout() {
+  const config = CONTAINER_CONFIGS[containerStyle];
+  barrelRoot.visible = containerStyle === 'wood';
+  drumRoot.visible = containerStyle === 'drum';
+
+  slots.forEach((slot) => {
+    const { rowIndex, angle } = slot.userData;
+    const height = config.rows[rowIndex];
+    const radius = config.radiusAt(height);
+    slot.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
+    slot.lookAt(0, height, 0);
+  });
+
+  const openingScale = config.openingRadius / 0.57;
+  opening.scale.set(openingScale, 1, openingScale);
+  opening.position.y = config.height + 0.01;
+  openingRim.scale.setScalar(openingScale);
+  openingRim.position.y = config.height + 0.035;
+  controls.target.y = config.height * 0.5;
+  controls.update();
+}
+
+function selectContainer(style) {
+  if (!CONTAINER_CONFIGS[style] || style === containerStyle) return;
+  containerStyle = style;
+  containerButtons.forEach((button) => {
+    const selected = button.dataset.container === style;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  updateContainerLayout();
+  resetGame();
+  hintLabel.textContent = style === 'wood'
+    ? '더 커진 오크통에서 구멍을 선택하세요'
+    : '금속 드럼통에서 구멍을 선택하세요';
+}
+
+function selectSword(style) {
+  swordStyle = style;
+  swordButtons.forEach((button) => {
+    const selected = button.dataset.sword === style;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  const names = { classic: '클래식 칼', cutlass: '해적 커틀러스', dagger: '보석 단검' };
+  hintLabel.textContent = `${names[style]} 선택 — 다음 구멍을 노리세요`;
+}
+
+function createShapedBlade(style, material) {
+  const shape = new THREE.Shape();
+  if (style === 'cutlass') {
+    shape.moveTo(-0.11, -0.2);
+    shape.quadraticCurveTo(-0.18, 0.48, 0.06, 1.08);
+    shape.lineTo(0.14, 0.92);
+    shape.quadraticCurveTo(0.01, 0.42, 0.05, -0.2);
+  } else {
+    shape.moveTo(-0.18, -0.18);
+    shape.lineTo(-0.2, 0.24);
+    shape.lineTo(0, 0.98);
+    shape.lineTo(0.2, 0.24);
+    shape.lineTo(0.18, -0.18);
+  }
+  shape.closePath();
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: style === 'dagger' ? 0.055 : 0.045,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    bevelSize: 0.012,
+    bevelThickness: 0.01,
+  });
+  geometry.rotateX(Math.PI / 2);
+  const blade = new THREE.Mesh(geometry, material);
+  blade.castShadow = true;
+  return blade;
 }
 
 function createSword(slot, player) {
+  const design = swordStyle;
   const sword = new THREE.Group();
   sword.position.copy(slot.position);
   sword.quaternion.copy(slot.quaternion);
-  sword.rotateZ(player === 0 ? -0.12 : 0.12);
+  const designRoll = design === 'cutlass' ? 0.34 : design === 'dagger' ? 0.04 : 0.12;
+  sword.rotateZ(player === 0 ? -designRoll : designRoll);
   sword.translateZ(-1.24);
   sword.userData.target = slot.position.clone();
   sword.userData.progress = 0;
@@ -223,48 +372,76 @@ function createSword(slot, player) {
   sword.userData.player = player;
   sword.userData.slot = slot;
   sword.userData.startedAt = elapsed;
+  sword.userData.design = design;
 
-  const blade = new THREE.Mesh(
-    new THREE.BoxGeometry(0.105, 0.045, 0.96),
-    new THREE.MeshStandardMaterial({ color: 0xdaf3f3, metalness: 0.94, roughness: 0.14 }),
-  );
-  blade.position.z = 0.25;
-  blade.castShadow = true;
-  sword.add(blade);
+  const bladeMaterial = new THREE.MeshStandardMaterial({
+    color: design === 'dagger' ? 0xc9efff : 0xdaf3f3,
+    metalness: 0.94,
+    roughness: 0.14,
+  });
+  if (design === 'classic') {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.045, 0.96), bladeMaterial);
+    blade.position.z = 0.25;
+    blade.castShadow = true;
+    sword.add(blade);
 
-  const tip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.072, 0.24, 4),
-    new THREE.MeshStandardMaterial({ color: 0xe8ffff, metalness: 0.94, roughness: 0.12 }),
-  );
-  tip.rotation.x = Math.PI / 2;
-  tip.rotation.y = Math.PI / 4;
-  tip.position.z = 0.85;
-  tip.castShadow = true;
-  sword.add(tip);
+    const tip = new THREE.Mesh(
+      new THREE.ConeGeometry(0.072, 0.24, 4),
+      new THREE.MeshStandardMaterial({ color: 0xe8ffff, metalness: 0.94, roughness: 0.12 }),
+    );
+    tip.rotation.x = Math.PI / 2;
+    tip.rotation.y = Math.PI / 4;
+    tip.position.z = 0.85;
+    tip.castShadow = true;
+    sword.add(tip);
+  } else {
+    sword.add(createShapedBlade(design, bladeMaterial));
+  }
 
+  const guardWidth = design === 'dagger' ? 0.64 : design === 'cutlass' ? 0.38 : 0.48;
   const guard = new THREE.Mesh(
-    new THREE.BoxGeometry(0.48, 0.11, 0.11),
+    new THREE.BoxGeometry(guardWidth, 0.11, 0.11),
     new THREE.MeshStandardMaterial({ color: 0xf0b83d, metalness: 0.8, roughness: 0.25 }),
   );
   guard.position.z = -0.27;
   guard.castShadow = true;
   sword.add(guard);
 
+  if (design === 'cutlass') {
+    const basket = new THREE.Mesh(
+      new THREE.TorusGeometry(0.19, 0.028, 8, 24, Math.PI * 1.25),
+      new THREE.MeshStandardMaterial({ color: 0xe2a72d, metalness: 0.83, roughness: 0.26 }),
+    );
+    basket.rotation.z = -0.42;
+    basket.position.z = -0.42;
+    basket.castShadow = true;
+    sword.add(basket);
+  }
+
   const gripColor = player === 0 ? 0x36cde2 : 0xff685f;
+  const gripLength = design === 'cutlass' ? 0.48 : design === 'dagger' ? 0.32 : 0.4;
   const handle = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.075, 0.075, 0.4, 12),
+    new THREE.CylinderGeometry(0.075, 0.075, gripLength, 12),
     new THREE.MeshStandardMaterial({ color: gripColor, roughness: 0.56, metalness: 0.08 }),
   );
   handle.rotation.x = Math.PI / 2;
-  handle.position.z = -0.5;
+  handle.position.z = design === 'cutlass' ? -0.54 : design === 'dagger' ? -0.45 : -0.5;
   handle.castShadow = true;
   sword.add(handle);
 
   const pommel = new THREE.Mesh(
-    new THREE.SphereGeometry(0.105, 14, 10),
-    new THREE.MeshStandardMaterial({ color: 0xe4ad32, metalness: 0.78, roughness: 0.28 }),
+    design === 'dagger'
+      ? new THREE.OctahedronGeometry(0.12)
+      : new THREE.SphereGeometry(0.105, 14, 10),
+    new THREE.MeshStandardMaterial({
+      color: design === 'dagger' ? 0x9e66ff : 0xe4ad32,
+      emissive: design === 'dagger' ? 0x2f0f72 : 0x000000,
+      emissiveIntensity: design === 'dagger' ? 0.55 : 0,
+      metalness: 0.78,
+      roughness: 0.28,
+    }),
   );
-  pommel.position.z = -0.73;
+  pommel.position.z = design === 'cutlass' ? -0.82 : design === 'dagger' ? -0.66 : -0.73;
   pommel.castShadow = true;
   sword.add(pommel);
   return sword;
@@ -343,7 +520,7 @@ function resetGame() {
   document.body.classList.remove('is-failed');
   hintLabel.textContent = '어두운 칼 구멍을 눌러보세요';
   pirate.scale.setScalar(0.001);
-  pirate.position.set(0, 2.28, 0);
+  pirate.position.set(0, CONTAINER_CONFIGS[containerStyle].height - 0.63, 0);
   pirate.rotation.set(0, 0, 0);
   gameRoot.position.set(0, 0, 0);
   gameRoot.rotation.set(0, 0, 0);
@@ -461,7 +638,8 @@ function animate(time) {
       ? pop / 0.92
       : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
     pirate.scale.setScalar(Math.max(0.001, overshoot));
-    pirate.position.y = 2.28 + pop * 1.05 + Math.sin(piratePop * Math.PI) * 0.34;
+    const pirateBaseY = CONTAINER_CONFIGS[containerStyle].height - 0.63;
+    pirate.position.y = pirateBaseY + pop * 1.05 + Math.sin(piratePop * Math.PI) * 0.34;
     pirate.rotation.y = Math.sin(elapsed * 9) * 0.14;
   }
 
@@ -478,6 +656,12 @@ canvas.addEventListener('pointermove', onPointerMove);
 canvas.addEventListener('pointerleave', () => {
   hoveredSlot = null;
   canvas.classList.remove('is-aiming');
+});
+containerButtons.forEach((button) => {
+  button.addEventListener('click', () => selectContainer(button.dataset.container));
+});
+swordButtons.forEach((button) => {
+  button.addEventListener('click', () => selectSword(button.dataset.sword));
 });
 document.querySelector('#reset-button').addEventListener('click', resetGame);
 document.querySelector('#play-again-button').addEventListener('click', resetGame);
@@ -501,7 +685,7 @@ loader.load(
 
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
-    const scale = 2.9 / size.y;
+    const scale = CONTAINER_CONFIGS.wood.height / size.y;
     model.scale.setScalar(scale);
     const scaledBox = new THREE.Box3().setFromObject(model);
     const center = scaledBox.getCenter(new THREE.Vector3());

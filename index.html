@@ -25,6 +25,28 @@
         <button id="reset-button" class="icon-button" type="button">새 게임</button>
       </header>
 
+      <aside class="loadout-panel" aria-label="게임 스타일 선택">
+        <div class="loadout-group">
+          <span class="loadout-group__label">통 선택</span>
+          <div class="choice-row" role="group" aria-label="통 선택">
+            <button class="choice-button is-selected" type="button" data-container="wood" aria-pressed="true">
+              <span>🪵</span> 오크통
+            </button>
+            <button class="choice-button" type="button" data-container="drum" aria-pressed="false">
+              <span>🛢️</span> 드럼통
+            </button>
+          </div>
+        </div>
+        <div class="loadout-group">
+          <span class="loadout-group__label">칼 디자인</span>
+          <div class="choice-row choice-row--swords" role="group" aria-label="칼 디자인">
+            <button class="sword-choice is-selected" type="button" data-sword="classic" aria-label="클래식 칼" aria-pressed="true">⚔</button>
+            <button class="sword-choice" type="button" data-sword="cutlass" aria-label="해적 커틀러스" aria-pressed="false">☾</button>
+            <button class="sword-choice" type="button" data-sword="dagger" aria-label="보석 단검" aria-pressed="false">◆</button>
+          </div>
+        </div>
+      </aside>
+
       <section class="turn-card" aria-live="polite">
         <div id="player-badge" class="player-badge">P1</div>
         <div>
