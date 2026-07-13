@@ -1506,7 +1506,7 @@ function renderRoomLobby() {
       ? `선원 ${roomCapacity - connectedPlayers.length}명 더 필요`
       : !allReady
         ? `${readyCount} / ${roomCapacity} 준비 완료`
-        : '전원 준비 완료 · 게임 시작';
+        : '전원 준비 완료 · 출항!';
   roomReadyGuide.textContent = roomGameActive
     ? '게임이 시작되었습니다. 참가자 휴대폰에서 자기 차례를 진행합니다.'
     : !roomFull
@@ -1516,8 +1516,8 @@ function renderRoomLobby() {
         : `참가자 휴대폰에서 준비 버튼을 눌러 주세요. (${readyCount}/${roomCapacity})`;
   if (remotePeer?.open) {
     remoteStatus.textContent = connectedPlayers.length
-      ? `게임 서버 연결됨 · 선원 ${connectedPlayers.length}/${roomCapacity}명`
-      : '게임 서버 연결됨 · 선원 접속 대기';
+      ? `모집소 열림 · 선원 ${connectedPlayers.length}/${roomCapacity}명`
+      : '모집소 열림 · 선원 접속 대기';
   }
 }
 
@@ -1671,8 +1671,8 @@ async function createOnlineRoom() {
   roomHostPanel.hidden = false;
   remoteQr.hidden = true;
   remoteLoading.hidden = false;
-  remoteLoading.textContent = '게임 서버에 방을 여는 중…';
-  remoteStatus.textContent = '게임 서버 연결 중';
+  remoteLoading.textContent = '초대장을 만드는 중…';
+  remoteStatus.textContent = '선원 모집소 연결 중';
   copyRemoteLinkButton.disabled = true;
   renderRoomLobby();
   activeRoomCode = createRoomCode();
@@ -1703,7 +1703,7 @@ async function createOnlineRoom() {
   peer.on('connection', handleRoomConnection);
   peer.on('disconnected', () => {
     if (remotePeer !== peer || peer.destroyed) return;
-    remoteStatus.textContent = '게임 서버 재연결 중…';
+    remoteStatus.textContent = '선원 모집소 재연결 중…';
     window.setTimeout(() => peer.reconnect(), 600);
   });
   peer.on('error', (error) => {
@@ -1716,7 +1716,7 @@ async function createOnlineRoom() {
     }
     remoteLoading.hidden = false;
     remoteLoading.textContent = '방 생성에 실패했습니다. 다시 시도해 주세요.';
-    remoteStatus.textContent = '게임 서버 연결 오류';
+    remoteStatus.textContent = '선원 모집소 연결 오류';
   });
 }
 
@@ -1782,7 +1782,7 @@ function startOnlineRoomGame() {
   sendRoomState();
   sendGameState();
   enterGameStage();
-  showToast(`${players.length}명의 온라인 선원으로 게임 시작!`);
+  showToast(`${players.length}명의 선원과 함께 출항합니다!`);
 }
 
 function resize() {
