@@ -277,8 +277,10 @@ gameRoot.add(openingRoot);
 
 const pirate = new THREE.Group();
 const PIRATE_REST_SCALE = 0.94;
-const PIRATE_POP_SCALE = 1.38;
+const PIRATE_POP_SCALE = PIRATE_REST_SCALE * 30;
 const PIRATE_REST_DEPTH = 1.27;
+const PIRATE_FACE_ANCHOR_Y = 1.45;
+const PIRATE_RETREAT_PER_SCALE = 0.22;
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
@@ -1136,7 +1138,7 @@ function endRound({ winnerIndex, loserIndex, reason }) {
   resultCopy.textContent = reason;
   resultScores.innerHTML = players.map((player) => `<span>${escapeHtml(player.name)} ${player.score}점</span>`).join('');
   resultButton.textContent = matchFinished ? '새 매치 시작' : '다음 라운드';
-  window.setTimeout(triggerPirate, pirateAwake ? 430 : 190);
+  window.setTimeout(triggerPirate, pirateAwake ? 820 : 190);
   updateHud();
   sendGameState();
 }
@@ -1518,13 +1520,25 @@ function animate(time) {
 
   const pirateBaseY = opening.position.y - PIRATE_REST_DEPTH;
   if (pirateAwake) {
-    piratePop = Math.min(1, piratePop + deltaTime * 2.7);
+    piratePop = Math.min(1, piratePop + deltaTime * 1.5);
     const pop = 1 - (1 - piratePop) ** 3;
     const overshoot = piratePop < 0.7
       ? pop / 0.92
       : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
-    pirate.scale.setScalar(THREE.MathUtils.lerp(PIRATE_REST_SCALE, PIRATE_POP_SCALE, Math.max(0, overshoot)));
-    pirate.position.y = pirateBaseY + pop * 0.98 + Math.sin(piratePop * Math.PI) * 0.28;
+    const currentScale = THREE.MathUtils.lerp(
+      PIRATE_REST_SCALE,
+      PIRATE_POP_SCALE,
+      THREE.MathUtils.clamp(overshoot, 0, 1),
+    );
+    const scaleDelta = currentScale - PIRATE_REST_SCALE;
+    const cameraDirection = new THREE.Vector3(camera.position.x, 0, camera.position.z).normalize();
+    pirate.scale.setScalar(currentScale);
+    pirate.position.x = -cameraDirection.x * scaleDelta * PIRATE_RETREAT_PER_SCALE;
+    pirate.position.z = -cameraDirection.z * scaleDelta * PIRATE_RETREAT_PER_SCALE;
+    pirate.position.y = pirateBaseY
+      + pop * 0.98
+      + Math.sin(piratePop * Math.PI) * 0.28
+      - scaleDelta * PIRATE_FACE_ANCHOR_Y;
     pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
     pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.2) * (1 - piratePop) * 0.12;
   } else if (fakeoutKick > 0) {
