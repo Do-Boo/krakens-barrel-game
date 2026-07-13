@@ -881,15 +881,13 @@ function createWeapon(slot, player) {
     .addScaledVector(outward, 1.72)
     .addScaledVector(tangent, approachSide * 0.78)
     .add(new THREE.Vector3(0, 0.18, 0));
+  const aimPosition = target.clone().addScaledVector(outward, 1.68);
   const pullbackPosition = target.clone()
-    .addScaledVector(outward, 1.96)
-    .addScaledVector(tangent, approachSide * 0.86)
-    .add(new THREE.Vector3(0, 0.22, 0));
+    .addScaledVector(outward, 1.96);
   const getAimQuaternion = (position) => new THREE.Quaternion()
     .setFromUnitVectors(new THREE.Vector3(0, 0, 1), target.clone().sub(position).normalize())
     .multiply(rollQuaternion);
   const approachQuaternion = getAimQuaternion(approachPosition);
-  const pullbackQuaternion = getAimQuaternion(pullbackPosition);
 
   weapon.position.copy(approachPosition);
   weapon.quaternion.copy(approachQuaternion);
@@ -904,9 +902,9 @@ function createWeapon(slot, player) {
     inward,
     outward,
     approachPosition,
+    aimPosition,
     pullbackPosition,
     approachQuaternion,
-    pullbackQuaternion,
     finalQuaternion,
   };
 
@@ -1432,40 +1430,36 @@ function animate(time) {
     const impactPosition = weapon.userData.target.clone().addScaledVector(weapon.userData.inward, 0.11);
     const reboundPosition = weapon.userData.target.clone().addScaledVector(weapon.userData.outward, 0.055);
     let position;
-    let aimProgress;
-    let fromQuaternion = weapon.userData.approachQuaternion;
-    if (progress < 0.2) {
-      const drawBack = progress / 0.2;
-      const easedDrawBack = 1 - (1 - drawBack) ** 2;
-      position = weapon.userData.approachPosition.clone().lerp(weapon.userData.pullbackPosition, easedDrawBack);
-      aimProgress = easedDrawBack;
-      fromQuaternion = weapon.userData.approachQuaternion;
-    } else if (progress < 0.34) {
-      position = weapon.userData.pullbackPosition;
-      aimProgress = 1;
-      fromQuaternion = weapon.userData.approachQuaternion;
+    if (progress < 0.24) {
+      const align = progress / 0.24;
+      const easedAlign = 1 - (1 - align) ** 3;
+      position = weapon.userData.approachPosition.clone().lerp(weapon.userData.aimPosition, easedAlign);
+      weapon.quaternion.slerpQuaternions(
+        weapon.userData.approachQuaternion,
+        weapon.userData.finalQuaternion,
+        easedAlign,
+      );
+    } else if (progress < 0.38) {
+      const drawBack = (progress - 0.24) / 0.14;
+      position = weapon.userData.aimPosition.clone().lerp(
+        weapon.userData.pullbackPosition,
+        1 - (1 - drawBack) ** 2,
+      );
+      weapon.quaternion.copy(weapon.userData.finalQuaternion);
     } else if (progress < 0.78) {
-      const strike = (progress - 0.34) / 0.44;
+      const strike = (progress - 0.38) / 0.4;
       const thrust = strike * strike * (3 - 2 * strike);
       position = weapon.userData.pullbackPosition.clone().lerp(impactPosition, thrust);
-      aimProgress = 1 - (1 - strike) ** 3;
-      fromQuaternion = weapon.userData.pullbackQuaternion;
+      weapon.quaternion.copy(weapon.userData.finalQuaternion);
     } else if (progress < 0.9) {
       const rebound = (progress - 0.78) / 0.12;
       position = impactPosition.lerp(reboundPosition, 1 - (1 - rebound) ** 2);
-      aimProgress = 1;
-      fromQuaternion = weapon.userData.finalQuaternion;
+      weapon.quaternion.copy(weapon.userData.finalQuaternion);
     } else {
       const settle = (progress - 0.9) / 0.1;
       position = reboundPosition.lerp(weapon.userData.target, 1 - (1 - settle) ** 2);
-      aimProgress = 1;
-      fromQuaternion = weapon.userData.finalQuaternion;
+      weapon.quaternion.copy(weapon.userData.finalQuaternion);
     }
-    weapon.quaternion.slerpQuaternions(
-      fromQuaternion,
-      progress < 0.34 ? weapon.userData.pullbackQuaternion : weapon.userData.finalQuaternion,
-      aimProgress,
-    );
     weapon.position.copy(position);
     if (progress >= 0.78 && !weapon.userData.impacted) {
       weapon.userData.impacted = true;
