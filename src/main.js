@@ -177,6 +177,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.38;
+renderer.localClippingEnabled = true;
 
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -280,8 +281,12 @@ const PIRATE_SIZE_MULTIPLIER = 5;
 const PIRATE_REST_SCALE = 0.94 * PIRATE_SIZE_MULTIPLIER;
 const PIRATE_POP_SCALE = 1.38 * PIRATE_SIZE_MULTIPLIER;
 const PIRATE_FACE_ANCHOR_Y = 1.45;
+const PIRATE_HEAD_CLIP_Y = 1.42;
 const PIRATE_REST_DEPTH = PIRATE_FACE_ANCHOR_Y * PIRATE_REST_SCALE - 0.1;
 const PIRATE_RETREAT_PER_SCALE = 0.22;
+const pirateClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const pirateClipPoint = new THREE.Vector3();
+const openingClipPoint = new THREE.Vector3();
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
@@ -1555,6 +1560,10 @@ function animate(time) {
     pirate.rotation.z = 0;
   }
 
+  const headClipY = pirate.localToWorld(pirateClipPoint.set(0, PIRATE_HEAD_CLIP_Y, 0)).y;
+  const openingClipY = openingRim.localToWorld(openingClipPoint.set(0, 0.02, 0)).y;
+  pirateClipPlane.constant = -Math.max(headClipY, openingClipY);
+
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
@@ -1621,6 +1630,21 @@ function prepareMeshyModel(model) {
       material.envMapIntensity = 0.9;
       material.needsUpdate = true;
     });
+  });
+}
+
+function clipPirateToHead(model) {
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const clippedMaterials = materials.map((material) => {
+      const clippedMaterial = material.clone();
+      clippedMaterial.clippingPlanes = [pirateClipPlane];
+      clippedMaterial.clipShadows = true;
+      clippedMaterial.needsUpdate = true;
+      return clippedMaterial;
+    });
+    object.material = Array.isArray(object.material) ? clippedMaterials : clippedMaterials[0];
   });
 }
 
@@ -1703,6 +1727,7 @@ async function loadMeshyAssets() {
       containerRoots[key].add(model);
     } else if (config.kind === 'pirate') {
       fitUprightModel(model, 1.8);
+      clipPirateToHead(model);
       pirate.add(model);
     } else {
       weaponTemplates.set(key, makeWeaponTemplate(model, config));
