@@ -1,12 +1,12 @@
 :root {
   color: #f9f5e8;
-  background: #081521;
+  background: #0d3b50;
   font-family: 'Noto Sans KR', system-ui, sans-serif;
   font-synthesis: none;
   --gold: #f3c860;
   --cyan: #4bd7e7;
-  --panel: rgba(7, 17, 26, 0.78);
-  --line: rgba(255, 255, 255, 0.12);
+  --panel: rgba(9, 35, 49, 0.76);
+  --line: rgba(255, 255, 255, 0.16);
 }
 
 * {
@@ -28,8 +28,9 @@ body,
 
 body {
   background:
-    radial-gradient(circle at 50% 28%, rgba(22, 126, 151, 0.32), transparent 36%),
-    linear-gradient(155deg, #102e3f 0%, #091826 50%, #07101a 100%);
+    radial-gradient(circle at 50% 26%, rgba(107, 231, 226, 0.52), transparent 38%),
+    radial-gradient(circle at 16% 72%, rgba(58, 166, 187, 0.32), transparent 34%),
+    linear-gradient(155deg, #32889a 0%, #17647c 48%, #0c3b58 100%);
 }
 
 body::before {
@@ -37,7 +38,7 @@ body::before {
   inset: 0;
   pointer-events: none;
   content: '';
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(to bottom, black, transparent 70%);
 }

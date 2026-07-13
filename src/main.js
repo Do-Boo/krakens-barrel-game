@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Peer } from 'peerjs';
 import QRCode from 'qrcode';
 
@@ -139,7 +140,7 @@ let audioContext = null;
 const firedFakeouts = new Set();
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x091726, 0.045);
+scene.fog = new THREE.FogExp2(0x2f7187, 0.026);
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
 camera.position.set(6.5, 4.2, 7.8);
@@ -150,7 +151,11 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.38;
+
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+pmremGenerator.dispose();
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -159,9 +164,9 @@ controls.minDistance = 5;
 controls.maxDistance = 12;
 controls.maxPolarAngle = Math.PI * 0.52;
 
-scene.add(new THREE.HemisphereLight(0x92dfff, 0x23120c, 2.5));
+scene.add(new THREE.HemisphereLight(0xc8f5ff, 0x5e3827, 3.25));
 
-const keyLight = new THREE.DirectionalLight(0xffd18a, 5.5);
+const keyLight = new THREE.DirectionalLight(0xffe1ad, 5.2);
 keyLight.position.set(4, 7, 5);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
@@ -173,7 +178,11 @@ keyLight.shadow.camera.top = 6;
 keyLight.shadow.camera.bottom = -6;
 scene.add(keyLight);
 
-const rimLight = new THREE.PointLight(0x17d7ff, 22, 12);
+const fillLight = new THREE.DirectionalLight(0xb7eaff, 2.4);
+fillLight.position.set(-4, 4.5, 6);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0x4de6ff, 15, 12);
 rimLight.position.set(-4, 3, -3);
 scene.add(rimLight);
 
@@ -183,7 +192,7 @@ scene.add(dangerLight);
 
 const table = new THREE.Mesh(
   new THREE.CylinderGeometry(4.7, 5.1, 0.55, 64),
-  new THREE.MeshStandardMaterial({ color: 0x4f2515, roughness: 0.82, metalness: 0.05 }),
+  new THREE.MeshStandardMaterial({ color: 0x744127, roughness: 0.78, metalness: 0.04 }),
 );
 table.position.y = -0.33;
 table.receiveShadow = true;
@@ -191,7 +200,7 @@ scene.add(table);
 
 const tableRim = new THREE.Mesh(
   new THREE.TorusGeometry(4.72, 0.16, 12, 64),
-  new THREE.MeshStandardMaterial({ color: 0x1b0d08, roughness: 0.7 }),
+  new THREE.MeshStandardMaterial({ color: 0x3b1d11, roughness: 0.68 }),
 );
 tableRim.rotation.x = Math.PI / 2;
 tableRim.position.y = -0.08;
