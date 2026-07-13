@@ -277,18 +277,22 @@ openingRoot.add(openingRim);
 gameRoot.add(openingRoot);
 
 const pirate = new THREE.Group();
-const PIRATE_SIZE_MULTIPLIER = 5;
+const PIRATE_SIZE_MULTIPLIER = 2.6;
 const PIRATE_REST_SCALE = 0.94 * PIRATE_SIZE_MULTIPLIER;
-const PIRATE_POP_SCALE = 1.38 * PIRATE_SIZE_MULTIPLIER;
+const PIRATE_POP_SCALE = 1.14 * PIRATE_SIZE_MULTIPLIER;
 const PIRATE_FACE_ANCHOR_Y = 1.45;
-const PIRATE_HEAD_CLIP_Y = 1.42;
 const PIRATE_REST_DEPTH = PIRATE_FACE_ANCHOR_Y * PIRATE_REST_SCALE - 0.1;
-const PIRATE_RETREAT_PER_SCALE = 0.22;
+const PIRATE_POP_RETREAT = 0.72;
 const pirateClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const pirateClipPoint = new THREE.Vector3();
 const openingClipPoint = new THREE.Vector3();
+const pirateFacePoint = new THREE.Vector3();
+const pirateFaceDirection = new THREE.Vector3();
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
+
+const pirateExpression = createPirateExpression();
+pirateExpression.visible = false;
+scene.add(pirateExpression);
 
 const weaponTemplates = new Map();
 
@@ -1511,7 +1515,7 @@ function animate(time) {
   impactKick = Math.max(0, impactKick - deltaTime * 4.8);
   fakeoutKick = Math.max(0, fakeoutKick - deltaTime * 1.7);
   const totalKick = Math.max(impactKick, fakeoutKick * 0.72);
-  const baseFov = pirateAwake ? 45 : 38;
+  const baseFov = pirateAwake ? 52 : 38;
   if (totalKick > 0) {
     gameRoot.rotation.z = Math.sin(elapsed * (impactKick > 0 ? 62 : 24)) * totalKick * 0.025;
     gameRoot.position.y = Math.abs(Math.sin(elapsed * 48)) * totalKick * 0.04;
@@ -1525,31 +1529,30 @@ function animate(time) {
   }
 
   const pirateBaseY = opening.position.y - PIRATE_REST_DEPTH;
+  let currentPirateScale = PIRATE_REST_SCALE;
   if (pirateAwake) {
     piratePop = Math.min(1, piratePop + deltaTime * 1.5);
     const pop = 1 - (1 - piratePop) ** 3;
     const overshoot = piratePop < 0.7
       ? pop / 0.92
       : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
-    const currentScale = THREE.MathUtils.lerp(
+    currentPirateScale = THREE.MathUtils.lerp(
       PIRATE_REST_SCALE,
       PIRATE_POP_SCALE,
       THREE.MathUtils.clamp(overshoot, 0, 1),
     );
-    const scaleDelta = currentScale - PIRATE_REST_SCALE;
     const cameraDirection = new THREE.Vector3(camera.position.x, 0, camera.position.z).normalize();
-    pirate.scale.setScalar(currentScale);
-    pirate.position.x = -cameraDirection.x * scaleDelta * PIRATE_RETREAT_PER_SCALE;
-    pirate.position.z = -cameraDirection.z * scaleDelta * PIRATE_RETREAT_PER_SCALE;
-    pirate.position.y = pirateBaseY
-      + pop * 0.98
-      + Math.sin(piratePop * Math.PI) * 0.28
-      - scaleDelta * PIRATE_FACE_ANCHOR_Y;
+    pirate.scale.setScalar(currentPirateScale);
+    pirate.position.x = -cameraDirection.x * pop * PIRATE_POP_RETREAT;
+    pirate.position.z = -cameraDirection.z * pop * PIRATE_POP_RETREAT;
+    pirate.position.y = THREE.MathUtils.lerp(pirateBaseY, opening.position.y + 0.12, pop)
+      + Math.sin(piratePop * Math.PI) * 0.58;
     pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
     pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.2) * (1 - piratePop) * 0.12;
   } else if (fakeoutKick > 0) {
     const peek = Math.sin((1 - fakeoutKick) * Math.PI);
-    pirate.scale.setScalar(PIRATE_REST_SCALE + peek * 0.035);
+    currentPirateScale = PIRATE_REST_SCALE + peek * 0.035;
+    pirate.scale.setScalar(currentPirateScale);
     pirate.position.y = pirateBaseY + peek * 0.16;
     pirate.rotation.y = Math.sin(elapsed * 8) * 0.22;
     pirate.rotation.z = 0;
@@ -1560,9 +1563,9 @@ function animate(time) {
     pirate.rotation.z = 0;
   }
 
-  const headClipY = pirate.localToWorld(pirateClipPoint.set(0, PIRATE_HEAD_CLIP_Y, 0)).y;
   const openingClipY = openingRim.localToWorld(openingClipPoint.set(0, 0.02, 0)).y;
-  pirateClipPlane.constant = -Math.max(headClipY, openingClipY);
+  pirateClipPlane.constant = -openingClipY;
+  updatePirateExpression(currentPirateScale);
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
@@ -1648,6 +1651,122 @@ function clipPirateToHead(model) {
   });
 }
 
+function createPirateExpression() {
+  const expression = new THREE.Group();
+  const eyeMaterial = new THREE.MeshBasicMaterial({
+    color: 0xfff5d8,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const inkMaterial = new THREE.MeshBasicMaterial({
+    color: 0x21100d,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const mouthMaterial = new THREE.MeshBasicMaterial({
+    color: 0x3a0b10,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  const makeEye = (x) => {
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24), eyeMaterial);
+    eye.position.set(x, 0.055, 0);
+    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.034, 20), inkMaterial);
+    pupil.position.z = 0.006;
+    eye.add(pupil);
+    expression.add(eye);
+    return { eye, pupil };
+  };
+
+  const left = makeEye(-0.135);
+  const right = makeEye(0.135);
+  const eyebrowGeometry = new THREE.PlaneGeometry(0.17, 0.034);
+  const leftBrow = new THREE.Mesh(eyebrowGeometry, inkMaterial);
+  const rightBrow = new THREE.Mesh(eyebrowGeometry, inkMaterial);
+  leftBrow.position.set(-0.135, 0.18, 0.008);
+  rightBrow.position.set(0.135, 0.18, 0.008);
+  expression.add(leftBrow, rightBrow);
+
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(0.082, 24), mouthMaterial);
+  mouth.position.set(0, -0.125, 0.01);
+  expression.add(mouth);
+
+  expression.userData = {
+    leftEye: left.eye,
+    rightEye: right.eye,
+    leftPupil: left.pupil,
+    rightPupil: right.pupil,
+    leftBrow,
+    rightBrow,
+    mouth,
+  };
+  expression.traverse((object) => {
+    if (!object.isMesh) return;
+    object.frustumCulled = false;
+    object.renderOrder = 12;
+  });
+  return expression;
+}
+
+function updatePirateExpression(currentScale) {
+  if (!pirateExpression.visible) return;
+  const {
+    leftEye,
+    rightEye,
+    leftPupil,
+    rightPupil,
+    leftBrow,
+    rightBrow,
+    mouth,
+  } = pirateExpression.userData;
+  const tension = slots.length ? insertedWeapons.length / slots.length : 0;
+  const isStartled = fakeoutKick > 0;
+  const blinkPhase = elapsed % 4.2;
+  const blink = !pirateAwake && !isStartled && blinkPhase > 3.92 ? 0.12 : 1;
+
+  let eyeScale = 0.84 + tension * 0.22;
+  let pupilOffset = tension > 0.25 ? Math.sin(elapsed * 3.8) * 0.025 : 0;
+  let leftBrowRotation = -0.08 - tension * 0.22;
+  let rightBrowRotation = 0.08 + tension * 0.22;
+  let mouthScaleX = 0.95;
+  let mouthScaleY = 0.22 + tension * 0.45;
+
+  if (isStartled) {
+    eyeScale = 1.24;
+    pupilOffset = 0;
+    leftBrowRotation = 0.28;
+    rightBrowRotation = -0.28;
+    mouthScaleX = 0.9;
+    mouthScaleY = 1.1;
+  }
+  if (pirateAwake) {
+    eyeScale = 1.42 + Math.sin(elapsed * 14) * 0.05;
+    pupilOffset = Math.sin(elapsed * 18) * 0.018;
+    leftBrowRotation = 0.38;
+    rightBrowRotation = -0.38;
+    mouthScaleX = 1.28;
+    mouthScaleY = 1.55;
+  }
+
+  leftEye.scale.set(eyeScale, eyeScale * blink, 1);
+  rightEye.scale.set(eyeScale, eyeScale * blink, 1);
+  leftPupil.position.x = pupilOffset;
+  rightPupil.position.x = pupilOffset;
+  leftBrow.rotation.z = leftBrowRotation;
+  rightBrow.rotation.z = rightBrowRotation;
+  leftBrow.position.y = pirateAwake || isStartled ? 0.205 : 0.18 - tension * 0.012;
+  rightBrow.position.y = leftBrow.position.y;
+  mouth.scale.set(mouthScaleX, mouthScaleY, 1);
+
+  pirate.localToWorld(pirateFacePoint.set(0, 1.56, 0));
+  pirateFaceDirection.copy(camera.position).sub(pirateFacePoint).normalize();
+  pirateFacePoint.addScaledVector(pirateFaceDirection, 0.34 * currentScale);
+  pirateExpression.position.copy(pirateFacePoint);
+  pirateExpression.quaternion.copy(camera.quaternion);
+  pirateExpression.scale.setScalar(currentScale);
+}
+
 function fitUprightModel(model, targetHeight, targetDiameter = 0) {
   const initialBox = new THREE.Box3().setFromObject(model);
   const scale = targetHeight / initialBox.getSize(new THREE.Vector3()).y;
@@ -1729,6 +1848,7 @@ async function loadMeshyAssets() {
       fitUprightModel(model, 1.8);
       clipPirateToHead(model);
       pirate.add(model);
+      pirateExpression.visible = true;
     } else {
       weaponTemplates.set(key, makeWeaponTemplate(model, config));
     }
