@@ -65,6 +65,19 @@ const WEAPON_NAMES = {
   umbrella: '선장의 우산',
 };
 
+const MESHY_ASSETS = {
+  wood: { file: 'oak_barrel.glb', kind: 'container' },
+  drum: { file: 'blue_drum.glb', kind: 'container' },
+  powder: { file: 'powder_barrel.glb', kind: 'container' },
+  pirate: { file: 'pirate_captain.glb', kind: 'pirate' },
+  classic: { file: 'captain_sword.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
+  cutlass: { file: 'cutlass.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
+  dagger: { file: 'kraken_dagger.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
+  fish: { file: 'frozen_mackerel.glb', kind: 'weapon', axis: 'z', rotation: 0 },
+  carrot: { file: 'legendary_carrot.glb', kind: 'weapon', axis: 'z', rotation: 0 },
+  umbrella: { file: 'captain_umbrella.glb', kind: 'weapon', axis: 'y', rotation: -Math.PI / 2 },
+};
+
 const CONTAINER_CONFIGS = {
   wood: {
     name: '오크통',
@@ -190,11 +203,11 @@ scene.add(gameRoot);
 const barrelRoot = new THREE.Group();
 gameRoot.add(barrelRoot);
 
-const drumRoot = createDrumContainer();
+const drumRoot = new THREE.Group();
 drumRoot.visible = false;
 gameRoot.add(drumRoot);
 
-const powderRoot = createPowderContainer();
+const powderRoot = new THREE.Group();
 powderRoot.visible = false;
 gameRoot.add(powderRoot);
 
@@ -226,9 +239,11 @@ openingRim.position.y = 2.935;
 openingRoot.add(openingRim);
 gameRoot.add(openingRoot);
 
-const pirate = createPirateCaptain();
+const pirate = new THREE.Group();
 pirate.scale.setScalar(0.001);
 gameRoot.add(pirate);
+
+const weaponTemplates = new Map();
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -569,10 +584,11 @@ function updateContainerLayout() {
   });
 
   const openingScale = config.openingRadius / 0.57;
+  const openingOffset = containerStyle === 'powder' ? -0.24 : containerStyle === 'drum' ? -0.06 : 0;
   opening.scale.set(openingScale, 1, openingScale);
-  opening.position.y = config.height + 0.01;
+  opening.position.y = config.height + openingOffset + 0.01;
   openingRim.scale.setScalar(openingScale);
-  openingRim.position.y = config.height + 0.035;
+  openingRim.position.y = config.height + openingOffset + 0.035;
   controls.target.y = config.height * 0.5;
   controls.update();
 }
@@ -803,11 +819,16 @@ function createWeapon(slot, player) {
     design,
   };
 
-  if (['fish', 'carrot', 'umbrella'].includes(design)) addComicWeapon(weapon, design);
-  else addSwordWeapon(weapon, design, player);
+  const template = weaponTemplates.get(design);
+  if (template) {
+    weapon.add(template.clone(true));
+  }
 
   weapon.traverse((object) => {
-    if (object.isMesh) object.castShadow = true;
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
   });
   return weapon;
 }
@@ -1378,8 +1399,6 @@ function animate(time) {
     pirate.scale.setScalar(Math.max(0.001, overshoot * 0.78));
     pirate.position.y = pirateBaseY + pop * 0.76 + Math.sin(piratePop * Math.PI) * 0.2;
     pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
-    pirate.userData.leftArm.rotation.z = -0.22 + Math.sin(elapsed * 7) * 0.55;
-    pirate.userData.rightArm.rotation.z = 0.22 - Math.sin(elapsed * 7) * 0.55;
   } else if (fakeoutKick > 0) {
     const peek = Math.sin((1 - fakeoutKick) * Math.PI);
     pirate.scale.setScalar(Math.max(0.001, peek * 0.34));
@@ -1390,9 +1409,6 @@ function animate(time) {
     pirate.position.y = pirateBaseY;
   }
 
-  pirate.userData.eye.material.emissiveIntensity = 0.65 + Math.sin(elapsed * 5) * 0.25;
-  pirate.userData.beard.rotation.z = Math.sin(elapsed * 3.5) * 0.04;
-  pirate.userData.hatCrown.rotation.y = Math.PI / 2 + Math.sin(elapsed * 2.7) * 0.03;
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
@@ -1447,38 +1463,102 @@ settingsDialog.addEventListener('close', () => {
 requestAnimationFrame(animate);
 
 const loader = new GLTFLoader();
-loader.load(
-  `${import.meta.env.BASE_URL}assets/models/barrel.glb`,
-  (gltf) => {
-    const model = gltf.scene;
-    model.traverse((object) => {
-      if (!object.isMesh) return;
-      if (!object.geometry.attributes.normal) object.geometry.computeVertexNormals();
-      if (object.material) {
-        object.material.envMapIntensity = 0.75;
-        object.material.needsUpdate = true;
-      }
-      object.castShadow = true;
-      object.receiveShadow = true;
+
+function prepareMeshyModel(model) {
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    if (!object.geometry.attributes.normal) object.geometry.computeVertexNormals();
+    object.castShadow = true;
+    object.receiveShadow = true;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.filter(Boolean).forEach((material) => {
+      material.envMapIntensity = 0.9;
+      material.needsUpdate = true;
     });
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const scale = CONTAINER_CONFIGS.wood.height / size.y;
-    model.scale.setScalar(scale);
-    const scaledBox = new THREE.Box3().setFromObject(model);
-    const center = scaledBox.getCenter(new THREE.Vector3());
-    model.position.x -= center.x;
-    model.position.z -= center.z;
-    model.position.y -= scaledBox.min.y;
-    barrelRoot.add(model);
-    loading.classList.add('loading--hidden');
-  },
-  (event) => {
-    if (event.total) loadingProgress.textContent = `${Math.round((event.loaded / event.total) * 100)}%`;
-  },
-  (error) => {
-    console.error(error);
-    loading.querySelector('strong').textContent = '모델을 불러오지 못했습니다';
+  });
+}
+
+function fitUprightModel(model, targetHeight, targetDiameter = 0) {
+  const initialBox = new THREE.Box3().setFromObject(model);
+  const scale = targetHeight / initialBox.getSize(new THREE.Vector3()).y;
+  model.scale.setScalar(scale);
+  if (targetDiameter) {
+    const heightScaledBox = new THREE.Box3().setFromObject(model);
+    const heightScaledSize = heightScaledBox.getSize(new THREE.Vector3());
+    const diameterScale = targetDiameter / Math.max(heightScaledSize.x, heightScaledSize.z);
+    model.scale.x *= diameterScale;
+    model.scale.z *= diameterScale;
+  }
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= box.min.y;
+  return model;
+}
+
+function makeWeaponTemplate(model, config) {
+  const template = new THREE.Group();
+  const visual = new THREE.Group();
+  visual.add(model);
+  template.add(visual);
+
+  if (config.axis === 'x') visual.rotation.y = config.rotation;
+  if (config.axis === 'y') visual.rotation.x = config.rotation;
+
+  let box = new THREE.Box3().setFromObject(visual);
+  const size = box.getSize(new THREE.Vector3());
+  const length = Math.max(size.x, size.y, size.z);
+  visual.scale.setScalar(1.9 / length);
+  box = new THREE.Box3().setFromObject(visual);
+  const scaledSize = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  visual.position.x -= center.x;
+  visual.position.y -= center.y;
+  visual.position.z -= box.min.z + scaledSize.z * 0.42;
+  return template;
+}
+
+async function loadMeshyAssets() {
+  const entries = Object.entries(MESHY_ASSETS);
+  const roots = { wood: barrelRoot, drum: drumRoot, powder: powderRoot };
+  let completed = 0;
+  loading.querySelector('strong').textContent = 'Meshy 에셋 10종을 불러오는 중';
+
+  const results = await Promise.allSettled(entries.map(async ([key, config]) => {
+    const url = `${import.meta.env.BASE_URL}assets/models/meshy/${config.file}`;
+    const gltf = await loader.loadAsync(url);
+    const model = gltf.scene;
+    prepareMeshyModel(model);
+
+    if (config.kind === 'container') {
+      const containerConfig = CONTAINER_CONFIGS[key];
+      const targetDiameter = containerConfig.radiusAt(containerConfig.height * 0.5) * 2;
+      fitUprightModel(model, containerConfig.height, targetDiameter);
+      roots[key].add(model);
+    } else if (config.kind === 'pirate') {
+      fitUprightModel(model, 1.8);
+      pirate.add(model);
+    } else {
+      weaponTemplates.set(key, makeWeaponTemplate(model, config));
+    }
+
+    completed += 1;
+    loadingProgress.textContent = `${completed} / ${entries.length}`;
+  }));
+
+  const failures = results.filter((result) => result.status === 'rejected');
+  if (failures.length) {
+    failures.forEach((failure) => console.error('Meshy asset load failed', failure.reason));
+    loading.querySelector('strong').textContent = `${failures.length}개 에셋을 불러오지 못했습니다`;
     loadingProgress.textContent = '새로고침해 주세요';
-  },
-);
+    return;
+  }
+
+  updateContainerLayout();
+  resetRound();
+  loadingProgress.textContent = '100%';
+  window.setTimeout(() => loading.classList.add('loading--hidden'), 180);
+}
+
+loadMeshyAssets();
