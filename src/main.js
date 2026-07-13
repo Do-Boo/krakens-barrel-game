@@ -280,11 +280,13 @@ const pirate = new THREE.Group();
 const PIRATE_SIZE_MULTIPLIER = 2.6;
 const PIRATE_REST_SCALE = 0.94 * PIRATE_SIZE_MULTIPLIER;
 const PIRATE_POP_SCALE = 1.14 * PIRATE_SIZE_MULTIPLIER;
-const PIRATE_FACE_ANCHOR_Y = 1.45;
-const PIRATE_REST_DEPTH = PIRATE_FACE_ANCHOR_Y * PIRATE_REST_SCALE - 0.1;
+const PIRATE_NECK_CLIP_Y = 1.27;
+const PIRATE_REST_DEPTH = PIRATE_NECK_CLIP_Y * PIRATE_REST_SCALE;
+const PIRATE_REST_FORWARD = 0.09;
 const PIRATE_POP_RETREAT = 0.72;
 const pirateClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const openingClipPoint = new THREE.Vector3();
+const pirateCameraDirection = new THREE.Vector3();
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
@@ -1523,6 +1525,8 @@ function animate(time) {
   }
 
   const pirateBaseY = opening.position.y - PIRATE_REST_DEPTH;
+  pirateCameraDirection.set(camera.position.x, 0, camera.position.z).normalize();
+  const pirateFacingYaw = Math.atan2(-pirateCameraDirection.x, -pirateCameraDirection.z);
   let currentPirateScale = PIRATE_REST_SCALE;
   if (pirateAwake) {
     piratePop = Math.min(1, piratePop + deltaTime * 1.5);
@@ -1535,26 +1539,30 @@ function animate(time) {
       PIRATE_POP_SCALE,
       THREE.MathUtils.clamp(overshoot, 0, 1),
     );
-    const cameraDirection = new THREE.Vector3(camera.position.x, 0, camera.position.z).normalize();
+    const radialOffset = THREE.MathUtils.lerp(PIRATE_REST_FORWARD, -PIRATE_POP_RETREAT, pop);
     pirate.scale.setScalar(currentPirateScale);
-    pirate.position.x = -cameraDirection.x * pop * PIRATE_POP_RETREAT;
-    pirate.position.z = -cameraDirection.z * pop * PIRATE_POP_RETREAT;
+    pirate.position.x = pirateCameraDirection.x * radialOffset;
+    pirate.position.z = pirateCameraDirection.z * radialOffset;
     pirate.position.y = THREE.MathUtils.lerp(pirateBaseY, opening.position.y + 0.12, pop)
       + Math.sin(piratePop * Math.PI) * 0.58;
-    pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
+    pirate.rotation.y = pirateFacingYaw + Math.sin(elapsed * 4.5) * 0.16;
     pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.2) * (1 - piratePop) * 0.12;
   } else if (fakeoutKick > 0) {
     const peek = Math.sin((1 - fakeoutKick) * Math.PI);
     currentPirateScale = PIRATE_REST_SCALE + peek * 0.035;
     pirate.scale.setScalar(currentPirateScale);
+    pirate.position.x = pirateCameraDirection.x * PIRATE_REST_FORWARD;
+    pirate.position.z = pirateCameraDirection.z * PIRATE_REST_FORWARD;
     pirate.position.y = pirateBaseY + peek * 0.16;
-    pirate.rotation.y = Math.sin(elapsed * 8) * 0.22;
-    pirate.rotation.z = 0;
+    pirate.rotation.y = pirateFacingYaw + Math.sin(elapsed * 8) * 0.22;
+    pirate.rotation.z = Math.sin(elapsed * 10) * 0.035;
   } else {
     pirate.scale.setScalar(PIRATE_REST_SCALE);
+    pirate.position.x = pirateCameraDirection.x * PIRATE_REST_FORWARD;
+    pirate.position.z = pirateCameraDirection.z * PIRATE_REST_FORWARD;
     pirate.position.y = pirateBaseY + Math.sin(elapsed * 2.1) * 0.012;
-    pirate.rotation.y = Math.sin(elapsed * 1.3) * 0.035;
-    pirate.rotation.z = 0;
+    pirate.rotation.y = pirateFacingYaw + Math.sin(elapsed * 1.3) * 0.045;
+    pirate.rotation.z = Math.sin(elapsed * 0.9) * 0.018;
   }
 
   const openingClipY = openingRim.localToWorld(openingClipPoint.set(0, 0.02, 0)).y;
