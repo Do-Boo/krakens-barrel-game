@@ -285,14 +285,8 @@ const PIRATE_REST_DEPTH = PIRATE_FACE_ANCHOR_Y * PIRATE_REST_SCALE - 0.1;
 const PIRATE_POP_RETREAT = 0.72;
 const pirateClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const openingClipPoint = new THREE.Vector3();
-const pirateFacePoint = new THREE.Vector3();
-const pirateFaceDirection = new THREE.Vector3();
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
-
-const pirateExpression = createPirateExpression();
-pirateExpression.visible = false;
-scene.add(pirateExpression);
 
 const weaponTemplates = new Map();
 
@@ -1565,7 +1559,6 @@ function animate(time) {
 
   const openingClipY = openingRim.localToWorld(openingClipPoint.set(0, 0.02, 0)).y;
   pirateClipPlane.constant = -openingClipY;
-  updatePirateExpression(currentPirateScale);
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
@@ -1651,122 +1644,6 @@ function clipPirateToHead(model) {
   });
 }
 
-function createPirateExpression() {
-  const expression = new THREE.Group();
-  const eyeMaterial = new THREE.MeshBasicMaterial({
-    color: 0xfff5d8,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  const inkMaterial = new THREE.MeshBasicMaterial({
-    color: 0x21100d,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  const mouthMaterial = new THREE.MeshBasicMaterial({
-    color: 0x3a0b10,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-
-  const makeEye = (x) => {
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24), eyeMaterial);
-    eye.position.set(x, 0.055, 0);
-    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.034, 20), inkMaterial);
-    pupil.position.z = 0.006;
-    eye.add(pupil);
-    expression.add(eye);
-    return { eye, pupil };
-  };
-
-  const left = makeEye(-0.135);
-  const right = makeEye(0.135);
-  const eyebrowGeometry = new THREE.PlaneGeometry(0.17, 0.034);
-  const leftBrow = new THREE.Mesh(eyebrowGeometry, inkMaterial);
-  const rightBrow = new THREE.Mesh(eyebrowGeometry, inkMaterial);
-  leftBrow.position.set(-0.135, 0.18, 0.008);
-  rightBrow.position.set(0.135, 0.18, 0.008);
-  expression.add(leftBrow, rightBrow);
-
-  const mouth = new THREE.Mesh(new THREE.CircleGeometry(0.082, 24), mouthMaterial);
-  mouth.position.set(0, -0.125, 0.01);
-  expression.add(mouth);
-
-  expression.userData = {
-    leftEye: left.eye,
-    rightEye: right.eye,
-    leftPupil: left.pupil,
-    rightPupil: right.pupil,
-    leftBrow,
-    rightBrow,
-    mouth,
-  };
-  expression.traverse((object) => {
-    if (!object.isMesh) return;
-    object.frustumCulled = false;
-    object.renderOrder = 12;
-  });
-  return expression;
-}
-
-function updatePirateExpression(currentScale) {
-  if (!pirateExpression.visible) return;
-  const {
-    leftEye,
-    rightEye,
-    leftPupil,
-    rightPupil,
-    leftBrow,
-    rightBrow,
-    mouth,
-  } = pirateExpression.userData;
-  const tension = slots.length ? insertedWeapons.length / slots.length : 0;
-  const isStartled = fakeoutKick > 0;
-  const blinkPhase = elapsed % 4.2;
-  const blink = !pirateAwake && !isStartled && blinkPhase > 3.92 ? 0.12 : 1;
-
-  let eyeScale = 0.84 + tension * 0.22;
-  let pupilOffset = tension > 0.25 ? Math.sin(elapsed * 3.8) * 0.025 : 0;
-  let leftBrowRotation = -0.08 - tension * 0.22;
-  let rightBrowRotation = 0.08 + tension * 0.22;
-  let mouthScaleX = 0.95;
-  let mouthScaleY = 0.22 + tension * 0.45;
-
-  if (isStartled) {
-    eyeScale = 1.24;
-    pupilOffset = 0;
-    leftBrowRotation = 0.28;
-    rightBrowRotation = -0.28;
-    mouthScaleX = 0.9;
-    mouthScaleY = 1.1;
-  }
-  if (pirateAwake) {
-    eyeScale = 1.42 + Math.sin(elapsed * 14) * 0.05;
-    pupilOffset = Math.sin(elapsed * 18) * 0.018;
-    leftBrowRotation = 0.38;
-    rightBrowRotation = -0.38;
-    mouthScaleX = 1.28;
-    mouthScaleY = 1.55;
-  }
-
-  leftEye.scale.set(eyeScale, eyeScale * blink, 1);
-  rightEye.scale.set(eyeScale, eyeScale * blink, 1);
-  leftPupil.position.x = pupilOffset;
-  rightPupil.position.x = pupilOffset;
-  leftBrow.rotation.z = leftBrowRotation;
-  rightBrow.rotation.z = rightBrowRotation;
-  leftBrow.position.y = pirateAwake || isStartled ? 0.205 : 0.18 - tension * 0.012;
-  rightBrow.position.y = leftBrow.position.y;
-  mouth.scale.set(mouthScaleX, mouthScaleY, 1);
-
-  pirate.localToWorld(pirateFacePoint.set(0, 1.56, 0));
-  pirateFaceDirection.copy(camera.position).sub(pirateFacePoint).normalize();
-  pirateFacePoint.addScaledVector(pirateFaceDirection, 0.34 * currentScale);
-  pirateExpression.position.copy(pirateFacePoint);
-  pirateExpression.quaternion.copy(camera.quaternion);
-  pirateExpression.scale.setScalar(currentScale);
-}
-
 function fitUprightModel(model, targetHeight, targetDiameter = 0) {
   const initialBox = new THREE.Box3().setFromObject(model);
   const scale = targetHeight / initialBox.getSize(new THREE.Vector3()).y;
@@ -1848,7 +1725,6 @@ async function loadMeshyAssets() {
       fitUprightModel(model, 1.8);
       clipPirateToHead(model);
       pirate.add(model);
-      pirateExpression.visible = true;
     } else {
       weaponTemplates.set(key, makeWeaponTemplate(model, config));
     }
