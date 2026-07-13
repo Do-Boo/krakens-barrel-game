@@ -154,6 +154,7 @@ let remoteSelectedSlot = null;
 let impactKick = 0;
 let fakeoutKick = 0;
 let piratePop = 0;
+let pirateAwake = false;
 let elapsed = 0;
 let lastFrameTime = 0;
 let turnDeadline = 0;
@@ -275,7 +276,10 @@ openingRoot.add(openingRim);
 gameRoot.add(openingRoot);
 
 const pirate = new THREE.Group();
-pirate.scale.setScalar(0.001);
+const PIRATE_REST_SCALE = 0.62;
+const PIRATE_POP_SCALE = 0.82;
+const PIRATE_REST_DEPTH = 0.74;
+pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
 const weaponTemplates = new Map();
@@ -1092,6 +1096,7 @@ function resolveWeaponImpact(weapon) {
   updateHud();
 
   if (triggerSlots.has(slot.userData.slotIndex)) {
+    pirateAwake = true;
     if (gameMode === 'reverse') endRound({ winnerIndex: player, reason: '크라켄을 깨워 보물을 차지했습니다!' });
     else endRound({ loserIndex: player, reason: '저주받은 구멍에서 크라켄이 깨어났습니다.' });
     return;
@@ -1131,20 +1136,24 @@ function endRound({ winnerIndex, loserIndex, reason }) {
   resultCopy.textContent = reason;
   resultScores.innerHTML = players.map((player) => `<span>${escapeHtml(player.name)} ${player.score}점</span>`).join('');
   resultButton.textContent = matchFinished ? '새 매치 시작' : '다음 라운드';
-  window.setTimeout(triggerPirate, 190);
+  window.setTimeout(triggerPirate, pirateAwake ? 430 : 190);
   updateHud();
   sendGameState();
 }
 
 function triggerPirate() {
-  playTone(92, 0.75, 'sawtooth', 0.09);
-  playTone(185, 0.42, 'square', 0.05, 0.12);
-  playTone(48, 0.9, 'sine', 0.08, 0.05);
+  if (pirateAwake) {
+    playTone(92, 0.75, 'sawtooth', 0.09);
+    playTone(185, 0.42, 'square', 0.05, 0.12);
+    playTone(48, 0.9, 'sine', 0.08, 0.05);
+    navigator.vibrate?.([140, 60, 200]);
+    sendRemote({ type: 'kraken' });
+  }
   resultCard.hidden = false;
-  hintLabel.textContent = gameMode === 'reverse' ? '크라켄의 보물이 열렸습니다!' : '크라켄 선장이 깨어났습니다!';
+  hintLabel.textContent = pirateAwake
+    ? gameMode === 'reverse' ? '크라켄의 보물이 열렸습니다!' : '크라켄 선장이 깨어났습니다!'
+    : '제한 시간이 끝났습니다!';
   document.body.classList.add('is-failed');
-  navigator.vibrate?.([140, 60, 200]);
-  sendRemote({ type: 'kraken' });
 }
 
 function chooseTriggerSlots() {
@@ -1171,6 +1180,7 @@ function resetRound() {
   impactKick = 0;
   fakeoutKick = 0;
   piratePop = 0;
+  pirateAwake = false;
   matchFinished = false;
   currentPlayer = roundStarter % players.length;
   firedFakeouts.clear();
@@ -1178,8 +1188,8 @@ function resetRound() {
   resultCard.hidden = true;
   document.body.classList.remove('is-failed', 'is-fakeout');
   hintLabel.textContent = `${players[currentPlayer].name}, 어두운 구멍을 선택하세요`;
-  pirate.scale.setScalar(0.001);
-  pirate.position.set(0, CONTAINER_CONFIGS[containerStyle].height - 0.6, 0);
+  pirate.scale.setScalar(PIRATE_REST_SCALE);
+  pirate.position.set(0, opening.position.y - PIRATE_REST_DEPTH, 0);
   pirate.rotation.set(0, 0, 0);
   gameRoot.position.set(0, 0, 0);
   gameRoot.rotation.set(0, 0, 0);
@@ -1505,24 +1515,28 @@ function animate(time) {
     camera.updateProjectionMatrix();
   }
 
-  const pirateBaseY = CONTAINER_CONFIGS[containerStyle].height - 0.6;
-  if (gameOver) {
+  const pirateBaseY = opening.position.y - PIRATE_REST_DEPTH;
+  if (pirateAwake) {
     piratePop = Math.min(1, piratePop + deltaTime * 2.7);
     const pop = 1 - (1 - piratePop) ** 3;
     const overshoot = piratePop < 0.7
       ? pop / 0.92
       : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
-    pirate.scale.setScalar(Math.max(0.001, overshoot * 0.78));
-    pirate.position.y = pirateBaseY + pop * 0.76 + Math.sin(piratePop * Math.PI) * 0.2;
+    pirate.scale.setScalar(THREE.MathUtils.lerp(PIRATE_REST_SCALE, PIRATE_POP_SCALE, Math.max(0, overshoot)));
+    pirate.position.y = pirateBaseY + pop * 1.22 + Math.sin(piratePop * Math.PI) * 0.28;
     pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
+    pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.2) * (1 - piratePop) * 0.12;
   } else if (fakeoutKick > 0) {
     const peek = Math.sin((1 - fakeoutKick) * Math.PI);
-    pirate.scale.setScalar(Math.max(0.001, peek * 0.34));
-    pirate.position.y = pirateBaseY + peek * 0.2;
+    pirate.scale.setScalar(PIRATE_REST_SCALE + peek * 0.035);
+    pirate.position.y = pirateBaseY + peek * 0.16;
     pirate.rotation.y = Math.sin(elapsed * 8) * 0.22;
+    pirate.rotation.z = 0;
   } else {
-    pirate.scale.setScalar(0.001);
-    pirate.position.y = pirateBaseY;
+    pirate.scale.setScalar(PIRATE_REST_SCALE);
+    pirate.position.y = pirateBaseY + Math.sin(elapsed * 2.1) * 0.012;
+    pirate.rotation.y = Math.sin(elapsed * 1.3) * 0.035;
+    pirate.rotation.z = 0;
   }
 
   renderer.render(scene, camera);
