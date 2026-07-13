@@ -7,3 +7,4 @@ output/playwright/
 public/assets/models/*-preview.glb
 source-assets/
 public/assets/models/barrel_textures/
+.vercel

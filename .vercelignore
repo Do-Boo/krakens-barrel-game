@@ -1,0 +1,6 @@
+source-assets/
+output/
+.playwright-cli/
+.playwright-mcp/
+node_modules/
+dist/
