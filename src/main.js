@@ -93,7 +93,13 @@ const MESHY_ASSETS = {
     forward: [-0.75071, -0.66063, -0.00018],
   },
   fish: { file: 'frozen_mackerel.glb', kind: 'weapon', axis: 'z', rotation: 0 },
-  carrot: { file: 'legendary_carrot.glb', kind: 'weapon', axis: 'z', rotation: 0 },
+  carrot: {
+    file: 'legendary_carrot.glb',
+    kind: 'weapon',
+    axis: 'z',
+    rotation: 0,
+    forward: [0.00103, -0.54763, -0.83672],
+  },
   umbrella: { file: 'captain_umbrella.glb', kind: 'weapon', axis: 'y', rotation: -Math.PI / 2 },
 };
 
