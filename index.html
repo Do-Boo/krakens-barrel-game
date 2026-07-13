@@ -24,7 +24,7 @@
           <h1>크라켄의 술통</h1>
         </div>
         <div class="header-actions">
-          <button id="remote-button" class="icon-button icon-button--remote" type="button">📱 QR 컨트롤</button>
+          <button id="remote-button" class="icon-button icon-button--remote" type="button">🌐 온라인 방</button>
           <button id="settings-button" class="icon-button" type="button">⚙ 게임 설정</button>
         </div>
       </header>
@@ -147,19 +147,49 @@
       <dialog id="remote-dialog" class="game-dialog game-dialog--remote">
         <div class="dialog-heading">
           <div>
-            <span class="brand__eyebrow">PHONE CONTROLLER</span>
-            <h2>휴대폰을 칼로 사용하기</h2>
+            <span class="brand__eyebrow">ONLINE CREW</span>
+            <h2>선원들과 온라인 방 만들기</h2>
           </div>
           <button class="dialog-close" type="button" data-close-dialog="remote-dialog" aria-label="닫기">×</button>
         </div>
-        <p class="dialog-description">같은 게임 링크를 휴대폰으로 스캔하면 구멍 선택과 칼 꽂기를 원격으로 조작할 수 있습니다.</p>
-        <div class="remote-qr-shell">
-          <div id="remote-loading" class="remote-loading">방을 만드는 중…</div>
-          <img id="remote-qr" alt="휴대폰 컨트롤러 연결 QR 코드" hidden />
+        <p class="dialog-description">방장이 게임 화면을 열어두고 참가자들은 휴대폰으로 접속합니다. 자기 차례에만 구멍과 무기를 선택할 수 있습니다.</p>
+
+        <div id="room-launch-panel" class="room-launch-panel">
+          <button id="create-room-button" class="primary-button room-create-button" type="button">새 온라인 방 만들기</button>
+          <div class="room-divider"><span>또는 참가 코드 입력</span></div>
+          <div class="room-join-row">
+            <input id="join-room-code" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ABC123" aria-label="온라인 방 참가 코드" />
+            <button id="join-room-button" class="secondary-button" type="button">참가</button>
+          </div>
         </div>
-        <strong id="remote-status" class="remote-status">연결 대기</strong>
-        <code id="remote-code" class="remote-code">------</code>
-        <button id="copy-remote-link" class="secondary-button" type="button" disabled>연결 링크 복사</button>
+
+        <div id="room-host-panel" class="room-host-panel" hidden>
+          <div class="room-server-status">
+            <span></span>
+            <strong id="remote-status" class="remote-status">게임 서버 연결 중</strong>
+          </div>
+          <div class="room-share-layout">
+            <div class="remote-qr-shell">
+              <div id="remote-loading" class="remote-loading">방을 만드는 중…</div>
+              <img id="remote-qr" alt="온라인 게임방 참가 QR 코드" hidden />
+            </div>
+            <div class="room-code-card">
+              <span>참가 코드</span>
+              <code id="remote-code" class="remote-code">------</code>
+              <p>휴대폰 카메라로 QR을 찍거나 코드를 알려주세요.</p>
+              <button id="copy-remote-link" class="secondary-button" type="button" disabled>초대 링크 복사</button>
+            </div>
+          </div>
+          <div class="room-lobby-heading">
+            <strong>접속한 선원</strong>
+            <span id="room-player-count">0 / 6</span>
+          </div>
+          <div id="room-player-list" class="room-player-list">
+            <p>아직 접속한 선원이 없습니다.</p>
+          </div>
+          <button id="start-room-game" class="primary-button" type="button" disabled>선원 2명 이상 필요</button>
+          <button id="close-room-button" class="secondary-button room-close-button" type="button">방 닫기</button>
+        </div>
       </dialog>
 
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -175,33 +205,53 @@
 
     <main id="controller-app" class="controller-app" hidden>
       <header class="controller-header">
-        <span class="brand__eyebrow">REMOTE CUTLASS</span>
-        <h1>크라켄 원격검</h1>
-        <p id="controller-status">게임에 연결하는 중…</p>
+        <span class="brand__eyebrow">KRAKEN CREW</span>
+        <h1>크라켄의 선원</h1>
+        <p id="controller-status">온라인 방 참가 준비 중…</p>
       </header>
-      <section class="controller-card">
-        <span>현재 차례</span>
-        <strong id="controller-player">선장에게 연결 중</strong>
-        <div id="controller-tension" class="controller-tension"><span></span></div>
+
+      <section id="controller-join-card" class="controller-join-card">
+        <span class="controller-room-label">참가할 방</span>
+        <code id="controller-room-code">------</code>
+        <label for="controller-name">선원 이름</label>
+        <input id="controller-name" type="text" maxlength="12" autocomplete="nickname" placeholder="이름을 입력하세요" />
+        <button id="controller-join-button" class="controller-primary-button" type="button">방에 참가하기</button>
       </section>
-      <section>
-        <h2>무기 선택</h2>
-        <div id="controller-weapons" class="controller-weapons">
-          <button class="is-selected" type="button" data-remote-weapon="classic">⚔</button>
-          <button type="button" data-remote-weapon="cutlass">☾</button>
-          <button type="button" data-remote-weapon="dagger">♆</button>
-          <button type="button" data-remote-weapon="fish">🐟</button>
-          <button type="button" data-remote-weapon="carrot">🥕</button>
-          <button type="button" data-remote-weapon="umbrella">☂</button>
+
+      <section id="controller-lobby" class="controller-lobby" hidden>
+        <div class="controller-lobby__heading">
+          <div><span>대기실</span><strong id="controller-seat">선원 등록 중</strong></div>
+          <code id="controller-lobby-code">------</code>
         </div>
+        <div id="controller-player-list" class="controller-player-list"></div>
+        <p>방장이 게임을 시작할 때까지 기다려주세요.</p>
       </section>
-      <section>
-        <h2>구멍 선택</h2>
-        <div id="controller-slots" class="controller-slots"></div>
-      </section>
-      <button id="controller-insert" class="controller-insert" type="button" disabled>
-        <span>칼 꽂기</span><small>선택한 구멍을 공격합니다</small>
-      </button>
+
+      <div id="controller-game" class="controller-game" hidden>
+        <section class="controller-card">
+          <span>현재 차례</span>
+          <strong id="controller-player">선장에게 연결 중</strong>
+          <div id="controller-tension" class="controller-tension"><span></span></div>
+        </section>
+        <section>
+          <h2>무기 선택</h2>
+          <div id="controller-weapons" class="controller-weapons">
+            <button class="is-selected" type="button" data-remote-weapon="classic">⚔</button>
+            <button type="button" data-remote-weapon="cutlass">☾</button>
+            <button type="button" data-remote-weapon="dagger">♆</button>
+            <button type="button" data-remote-weapon="fish">🐟</button>
+            <button type="button" data-remote-weapon="carrot">🥕</button>
+            <button type="button" data-remote-weapon="umbrella">☂</button>
+          </div>
+        </section>
+        <section>
+          <h2>구멍 선택</h2>
+          <div id="controller-slots" class="controller-slots"></div>
+        </section>
+        <button id="controller-insert" class="controller-insert" type="button" disabled>
+          <span>칼 꽂기</span><small>선택한 구멍을 공격합니다</small>
+        </button>
+      </div>
     </main>
 
     <script type="module" src="/src/bootstrap.js"></script>

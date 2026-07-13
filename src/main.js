@@ -4,6 +4,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Peer } from 'peerjs';
 import QRCode from 'qrcode';
+import {
+  createRoomCode,
+  MAX_ROOM_PLAYERS,
+  MIN_ROOM_PLAYERS,
+  normalizePlayerName,
+  normalizeRoomCode,
+  roomPeerId,
+} from './room-protocol.js';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#game-canvas');
@@ -33,6 +41,15 @@ const remoteLoading = $('#remote-loading');
 const remoteStatus = $('#remote-status');
 const remoteCode = $('#remote-code');
 const copyRemoteLinkButton = $('#copy-remote-link');
+const roomLaunchPanel = $('#room-launch-panel');
+const roomHostPanel = $('#room-host-panel');
+const createRoomButton = $('#create-room-button');
+const joinRoomCodeInput = $('#join-room-code');
+const joinRoomButton = $('#join-room-button');
+const roomPlayerCount = $('#room-player-count');
+const roomPlayerList = $('#room-player-list');
+const startRoomGameButton = $('#start-room-game');
+const closeRoomButton = $('#close-room-button');
 const toast = $('#toast');
 const containerButtons = [...document.querySelectorAll('[data-container]')];
 const swordButtons = [...document.querySelectorAll('[data-sword]')];
@@ -301,8 +318,11 @@ const slots = [];
 const insertedWeapons = [];
 
 let remotePeer = null;
-let remoteConnection = null;
 let remoteLink = '';
+let activeRoomCode = '';
+let roomGameActive = false;
+let roomCreationAttempt = 0;
+const roomPlayers = new Map();
 
 function createDrumContainer() {
   const root = new THREE.Group();
@@ -1214,7 +1234,7 @@ function resetRound() {
     slot.userData.target.material.color.setHex(0x060303);
     slot.userData.damage.clear();
     slot.userData.damage.visible = false;
-    slot.userData.label.visible = Boolean(remoteConnection?.open);
+    slot.userData.label.visible = connectedRoomPlayers().length > 0;
   });
   startTurnTimer();
   updateTension();
@@ -1308,100 +1328,350 @@ function startConfiguredGame() {
   showToast(`${players.length}명 · ${MODE_CONFIGS[gameMode].name} 시작!`);
 }
 
-function sendRemote(message) {
-  if (remoteConnection?.open) remoteConnection.send(message);
+function connectedRoomPlayers() {
+  return [...roomPlayers.values()].filter((player) => player.connected && player.connection?.open);
 }
 
-function gameState() {
+function sortedRoomPlayers() {
+  return [...roomPlayers.values()].sort((a, b) => a.playerIndex - b.playerIndex);
+}
+
+function sendToRoomPlayer(player, message) {
+  if (player?.connected && player.connection?.open) player.connection.send(message);
+}
+
+function sendRemote(message) {
+  connectedRoomPlayers().forEach((player) => sendToRoomPlayer(player, message));
+}
+
+function roomState(player) {
   return {
-    currentPlayerName: players[currentPlayer]?.name,
-    currentPlayer,
-    usedSlots: slots.filter((slot) => slot.userData.used).map((slot) => slot.userData.slotIndex),
-    tension: insertedWeapons.length / slots.length,
-    gameOver,
-    isAnimating,
-    swordStyle,
+    roomCode: activeRoomCode,
+    started: roomGameActive,
+    yourPlayerIndex: player?.playerIndex ?? null,
+    players: sortedRoomPlayers().map((candidate) => ({
+      playerIndex: candidate.playerIndex,
+      name: candidate.name,
+      connected: candidate.connected,
+    })),
   };
 }
 
-function sendGameState() {
-  sendRemote({ type: 'game-state', state: gameState() });
+function gameState(player) {
+  const isYourTurn = roomGameActive && player?.playerIndex === currentPlayer;
+  return {
+    roomStarted: roomGameActive,
+    currentPlayerName: players[currentPlayer]?.name,
+    currentPlayer,
+    yourPlayerIndex: player?.playerIndex ?? null,
+    isYourTurn,
+    canAct: Boolean(isYourTurn && !gameOver && !isAnimating),
+    usedSlots: slots.filter((slot) => slot.userData.used).map((slot) => slot.userData.slotIndex),
+    slotCount: slots.length,
+    tension: insertedWeapons.length / Math.max(1, slots.length),
+    gameOver,
+    isAnimating,
+    swordStyle,
+    roundNumber,
+    players: players.map((candidate, playerIndex) => ({
+      playerIndex,
+      name: candidate.name,
+      score: candidate.score,
+      connected: sortedRoomPlayers().find((entry) => entry.playerIndex === playerIndex)?.connected ?? true,
+    })),
+  };
 }
 
-function handleRemoteMessage(message) {
+function sendRoomState() {
+  connectedRoomPlayers().forEach((player) => {
+    sendToRoomPlayer(player, { type: 'room-state', state: roomState(player) });
+  });
+}
+
+function sendGameState() {
+  if (!roomGameActive) return;
+  connectedRoomPlayers().forEach((player) => {
+    sendToRoomPlayer(player, { type: 'game-state', state: gameState(player) });
+  });
+}
+
+function renderRoomLobby() {
+  const connectedPlayers = connectedRoomPlayers();
+  roomPlayerCount.textContent = `${connectedPlayers.length} / ${MAX_ROOM_PLAYERS}`;
+  if (!roomPlayers.size) {
+    roomPlayerList.innerHTML = '<p>아직 접속한 선원이 없습니다.</p>';
+  } else {
+    roomPlayerList.innerHTML = sortedRoomPlayers().map((player) => `
+      <div class="room-player" style="--player-color:${PLAYER_COLORS[player.playerIndex]?.css ?? '#d7dee5'}">
+        <span class="room-player__badge">P${player.playerIndex + 1}</span>
+        <strong>${escapeHtml(player.name)}</strong>
+        <i>${player.connected ? '접속' : '재접속 대기'}</i>
+      </div>
+    `).join('');
+  }
+
+  startRoomGameButton.disabled = connectedPlayers.length < MIN_ROOM_PLAYERS || roomGameActive;
+  startRoomGameButton.textContent = roomGameActive
+    ? '게임 진행 중'
+    : connectedPlayers.length < MIN_ROOM_PLAYERS
+      ? `선원 ${MIN_ROOM_PLAYERS}명 이상 필요`
+      : `${connectedPlayers.length}명으로 게임 시작`;
+  if (remotePeer?.open) {
+    remoteStatus.textContent = connectedPlayers.length
+      ? `게임 서버 연결됨 · 선원 ${connectedPlayers.length}명`
+      : '게임 서버 연결됨 · 선원 접속 대기';
+  }
+}
+
+function rejectRoomAction(player, reason) {
+  sendToRoomPlayer(player, { type: 'action-rejected', reason });
+}
+
+function handleRemoteMessage(message, player) {
   if (!message?.type) return;
   if (message.type === 'controller-ready') {
-    sendGameState();
+    sendToRoomPlayer(player, { type: 'room-state', state: roomState(player) });
+    if (roomGameActive) sendToRoomPlayer(player, { type: 'game-state', state: gameState(player) });
+    return;
+  }
+  if (!roomGameActive) {
+    rejectRoomAction(player, '아직 방장이 게임을 시작하지 않았습니다.');
+    return;
+  }
+  if (player.playerIndex !== currentPlayer) {
+    rejectRoomAction(player, `${players[currentPlayer]?.name ?? '다음 선원'}의 차례입니다.`);
+    return;
+  }
+  if (gameOver || isAnimating) {
+    rejectRoomAction(player, gameOver ? '라운드가 끝났습니다.' : '칼을 꽂는 중입니다.');
     return;
   }
   if (message.type === 'select-weapon') {
-    if (!WEAPON_NAMES[message.style]) return;
+    if (!Object.hasOwn(WEAPON_NAMES, message.style)) return;
     selectSword(message.style);
-    showToast(`휴대폰에서 ${WEAPON_NAMES[message.style]} 선택`);
+    showToast(`${player.name} 선원이 ${WEAPON_NAMES[message.style]} 선택`);
     return;
   }
   if (message.type === 'select-slot') {
-    const slot = slots[message.slotIndex];
-    if (!slot?.userData.used && !gameOver) {
+    const slot = slots[Number(message.slotIndex)];
+    if (!slot?.userData.used) {
       remoteSelectedSlot = slot;
-      hintLabel.textContent = `원격 컨트롤러가 ${message.slotIndex + 1}번 구멍을 조준했습니다`;
+      hintLabel.textContent = `${player.name} 선원이 ${slot.userData.slotIndex + 1}번 구멍을 조준했습니다`;
     }
     return;
   }
   if (message.type === 'insert-slot') {
-    const slot = slots[message.slotIndex];
+    const slot = slots[Number(message.slotIndex)];
     if (slot && !slot.userData.used) insertWeapon(slot);
   }
 }
 
-async function initializeRemoteRoom() {
+function nextRoomPlayerIndex() {
+  const occupied = new Set(sortedRoomPlayers().map((player) => player.playerIndex));
+  for (let index = 0; index < MAX_ROOM_PLAYERS; index += 1) {
+    if (!occupied.has(index)) return index;
+  }
+  return -1;
+}
+
+function registerRoomPlayer(connection, message) {
+  const clientId = String(message.clientId || connection.peer).slice(0, 80);
+  let player = roomPlayers.get(clientId);
+
+  if (roomGameActive && !player) {
+    connection.send({ type: 'room-error', reason: '이미 게임이 시작되어 새 선원은 참가할 수 없습니다.' });
+    window.setTimeout(() => connection.close(), 120);
+    return null;
+  }
+
+  if (!player) {
+    const playerIndex = nextRoomPlayerIndex();
+    if (playerIndex < 0) {
+      connection.send({ type: 'room-error', reason: '이 방은 선원 6명이 모두 찼습니다.' });
+      window.setTimeout(() => connection.close(), 120);
+      return null;
+    }
+    player = {
+      clientId,
+      name: normalizePlayerName(message.name, `선원 ${playerIndex + 1}`),
+      playerIndex,
+      connection,
+      connected: true,
+    };
+    roomPlayers.set(clientId, player);
+  } else {
+    if (player.connection?.open && player.connection !== connection) player.connection.close();
+    player.name = normalizePlayerName(message.name, player.name);
+    player.connection = connection;
+    player.connected = true;
+    if (roomGameActive && players[player.playerIndex]) players[player.playerIndex].name = player.name;
+  }
+
+  connection.send({
+    type: 'room-joined',
+    roomCode: activeRoomCode,
+    playerIndex: player.playerIndex,
+    name: player.name,
+  });
+  slots.forEach((slot) => { slot.userData.label.visible = true; });
+  renderRoomLobby();
+  sendRoomState();
+  if (roomGameActive) sendGameState();
+  showToast(`${player.name} 선원이 방에 참가했습니다`);
+  return player;
+}
+
+function handleRoomConnection(connection) {
+  let player = null;
+  connection.on('data', (message) => {
+    if (message?.type === 'join-room') {
+      player = registerRoomPlayer(connection, message);
+      return;
+    }
+    if (!player) {
+      connection.send({ type: 'room-error', reason: '선원 이름을 등록한 뒤 참가해 주세요.' });
+      return;
+    }
+    handleRemoteMessage(message, player);
+  });
+
+  connection.on('close', () => {
+    if (!player || player.connection !== connection) return;
+    player.connected = false;
+    remoteSelectedSlot = null;
+    renderRoomLobby();
+    sendRoomState();
+    sendGameState();
+    if (!roomGameActive) {
+      window.setTimeout(() => {
+        if (player.connected || player.connection !== connection) return;
+        roomPlayers.delete(player.clientId);
+        sortedRoomPlayers().forEach((candidate, index) => { candidate.playerIndex = index; });
+        renderRoomLobby();
+        sendRoomState();
+      }, 5000);
+    }
+  });
+}
+
+function openOnlineDialog() {
   remoteDialog.showModal();
+  renderRoomLobby();
+}
+
+async function createOnlineRoom() {
   if (remotePeer && !remotePeer.destroyed) return;
+  roomCreationAttempt += 1;
+  roomLaunchPanel.hidden = true;
+  roomHostPanel.hidden = false;
   remoteQr.hidden = true;
   remoteLoading.hidden = false;
-  remoteStatus.textContent = '연결 대기';
-  remotePeer = new Peer(undefined, { debug: 1 });
+  remoteLoading.textContent = '게임 서버에 방을 여는 중…';
+  remoteStatus.textContent = '게임 서버 연결 중';
+  copyRemoteLinkButton.disabled = true;
+  activeRoomCode = createRoomCode();
+  remoteCode.textContent = activeRoomCode;
 
-  remotePeer.on('open', async (peerId) => {
+  const peer = new Peer(roomPeerId(activeRoomCode), { debug: 1 });
+  remotePeer = peer;
+
+  peer.on('open', async () => {
+    if (remotePeer !== peer) return;
     const url = new URL(window.location.href);
     url.search = '';
-    url.searchParams.set('controller', peerId);
+    url.searchParams.set('room', activeRoomCode);
     remoteLink = url.toString();
-    copyRemoteLinkButton.dataset.link = remoteLink;
     remoteQr.src = await QRCode.toDataURL(remoteLink, {
       width: 420,
       margin: 1,
       color: { dark: '#07131fff', light: '#ffffffff' },
     });
+    if (remotePeer !== peer || peer.destroyed) return;
     remoteQr.hidden = false;
     remoteLoading.hidden = true;
-    remoteCode.textContent = peerId.slice(-6).toUpperCase();
     copyRemoteLinkButton.disabled = false;
+    roomCreationAttempt = 0;
+    renderRoomLobby();
   });
 
-  remotePeer.on('connection', (connection) => {
-    if (remoteConnection?.open) remoteConnection.close();
-    remoteConnection = connection;
-    connection.on('open', () => {
-      remoteStatus.textContent = '휴대폰 연결됨 ✓';
-      slots.forEach((slot) => { slot.userData.label.visible = true; });
-      showToast('휴대폰 컨트롤러가 연결되었습니다');
-      sendGameState();
-    });
-    connection.on('data', handleRemoteMessage);
-    connection.on('close', () => {
-      remoteStatus.textContent = '연결 종료 · 다시 스캔 가능';
-      remoteConnection = null;
-      remoteSelectedSlot = null;
-      slots.forEach((slot) => { slot.userData.label.visible = false; });
-    });
+  peer.on('connection', handleRoomConnection);
+  peer.on('disconnected', () => {
+    if (remotePeer !== peer || peer.destroyed) return;
+    remoteStatus.textContent = '게임 서버 재연결 중…';
+    window.setTimeout(() => peer.reconnect(), 600);
   });
-
-  remotePeer.on('error', (error) => {
+  peer.on('error', (error) => {
     console.error(error);
-    remoteLoading.textContent = '방 생성에 실패했습니다. 다시 열어주세요.';
-    remoteStatus.textContent = '연결 오류';
+    if (error.type === 'unavailable-id' && roomCreationAttempt < 5) {
+      peer.destroy();
+      if (remotePeer === peer) remotePeer = null;
+      window.setTimeout(createOnlineRoom, 100);
+      return;
+    }
+    remoteLoading.hidden = false;
+    remoteLoading.textContent = '방 생성에 실패했습니다. 다시 시도해 주세요.';
+    remoteStatus.textContent = '게임 서버 연결 오류';
   });
+}
+
+function closeOnlineRoom() {
+  connectedRoomPlayers().forEach((player) => {
+    sendToRoomPlayer(player, { type: 'room-closed', reason: '방장이 온라인 방을 닫았습니다.' });
+    player.connection.close();
+  });
+  roomPlayers.clear();
+  remotePeer?.destroy();
+  remotePeer = null;
+  activeRoomCode = '';
+  remoteLink = '';
+  roomGameActive = false;
+  remoteSelectedSlot = null;
+  roomCreationAttempt = 0;
+  remoteQr.hidden = true;
+  remoteCode.textContent = '------';
+  copyRemoteLinkButton.disabled = true;
+  roomHostPanel.hidden = true;
+  roomLaunchPanel.hidden = false;
+  slots.forEach((slot) => { slot.userData.label.visible = false; });
+  renderRoomLobby();
+}
+
+function joinRoomByCode() {
+  const roomCode = normalizeRoomCode(joinRoomCodeInput.value);
+  if (roomCode.length !== 6) {
+    showToast('6자리 참가 코드를 입력해 주세요');
+    joinRoomCodeInput.focus();
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.searchParams.set('room', roomCode);
+  window.location.assign(url);
+}
+
+function startOnlineRoomGame() {
+  const connectedPlayers = connectedRoomPlayers().sort((a, b) => a.playerIndex - b.playerIndex);
+  if (connectedPlayers.length < MIN_ROOM_PLAYERS) return;
+
+  roomPlayers.forEach((player, clientId) => {
+    if (!player.connected) roomPlayers.delete(clientId);
+  });
+  connectedPlayers.forEach((player, playerIndex) => { player.playerIndex = playerIndex; });
+  players = connectedPlayers.map((player, playerIndex) => ({
+    name: player.name,
+    score: 0,
+    ...PLAYER_COLORS[playerIndex],
+  }));
+  gameMode = modeButtons.find((button) => button.classList.contains('is-selected'))?.dataset.mode ?? 'classic';
+  targetScore = Number(targetButtons.find((button) => button.classList.contains('is-selected'))?.dataset.targetScore ?? 3);
+  roundNumber = 1;
+  roundStarter = 0;
+  roomGameActive = true;
+  resetRound();
+  sendRoomState();
+  sendGameState();
+  remoteDialog.close();
+  showToast(`${players.length}명의 온라인 선원으로 게임 시작!`);
 }
 
 function resize() {
@@ -1608,7 +1878,17 @@ $('#settings-button').addEventListener('click', () => {
   turnDeadline = 0;
   settingsDialog.showModal();
 });
-$('#remote-button').addEventListener('click', initializeRemoteRoom);
+$('#remote-button').addEventListener('click', openOnlineDialog);
+createRoomButton.addEventListener('click', createOnlineRoom);
+joinRoomButton.addEventListener('click', joinRoomByCode);
+joinRoomCodeInput.addEventListener('input', () => {
+  joinRoomCodeInput.value = normalizeRoomCode(joinRoomCodeInput.value);
+});
+joinRoomCodeInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') joinRoomByCode();
+});
+startRoomGameButton.addEventListener('click', startOnlineRoomGame);
+closeRoomButton.addEventListener('click', closeOnlineRoom);
 resultButton.addEventListener('click', nextRound);
 document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => {
   document.getElementById(button.dataset.closeDialog)?.close();

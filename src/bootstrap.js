@@ -1,8 +1,9 @@
 import '../styles.css';
 
-const controllerPeerId = new URLSearchParams(window.location.search).get('controller');
+const params = new URLSearchParams(window.location.search);
+const isController = params.has('room') || params.has('controller');
 
-if (controllerPeerId) {
+if (isController) {
   document.querySelector('#app').hidden = true;
   document.querySelector('#controller-app').hidden = false;
   import('./controller.js');
