@@ -7,7 +7,6 @@ import QRCode from 'qrcode';
 import {
   createRoomCode,
   MAX_ROOM_PLAYERS,
-  MIN_ROOM_PLAYERS,
   normalizePlayerName,
   normalizeRoomCode,
   roomPeerId,
@@ -33,21 +32,33 @@ const resultCopy = $('#result-copy');
 const resultScores = $('#result-scores');
 const resultButton = $('#play-again-button');
 const settingsDialog = $('#settings-dialog');
-const remoteDialog = $('#remote-dialog');
+const settingsButton = $('#settings-button');
 const playerCountSelect = $('#player-count');
 const playerNameFields = $('#player-name-fields');
+const startScreen = $('#start-screen');
+const gameStage = $('#game-stage');
+const startHomePanel = $('#start-home-panel');
+const hostSetupPanel = $('#host-setup-panel');
+const showHostSetupButton = $('#show-host-setup');
+const backStartHomeButton = $('#back-start-home');
+const startLocalGameButton = $('#start-local-game');
+const roomCapacitySelect = $('#room-capacity');
+const roomModeButtons = [...document.querySelectorAll('[data-room-mode]')];
+const roomTargetButtons = [...document.querySelectorAll('[data-room-target]')];
+const roomContainerButtons = [...document.querySelectorAll('[data-room-container]')];
 const remoteQr = $('#remote-qr');
 const remoteLoading = $('#remote-loading');
 const remoteStatus = $('#remote-status');
 const remoteCode = $('#remote-code');
 const copyRemoteLinkButton = $('#copy-remote-link');
-const roomLaunchPanel = $('#room-launch-panel');
 const roomHostPanel = $('#room-host-panel');
 const createRoomButton = $('#create-room-button');
 const joinRoomCodeInput = $('#join-room-code');
 const joinRoomButton = $('#join-room-button');
 const roomPlayerCount = $('#room-player-count');
 const roomPlayerList = $('#room-player-list');
+const roomSettingsSummary = $('#room-settings-summary');
+const roomReadyGuide = $('#room-ready-guide');
 const startRoomGameButton = $('#start-room-game');
 const closeRoomButton = $('#close-room-button');
 const toast = $('#toast');
@@ -322,6 +333,12 @@ let remoteLink = '';
 let activeRoomCode = '';
 let roomGameActive = false;
 let roomCreationAttempt = 0;
+let roomCapacity = 4;
+let activeRoomSettings = {
+  mode: 'classic',
+  targetScore: 3,
+  container: 'wood',
+};
 const roomPlayers = new Map();
 
 function createDrumContainer() {
@@ -1284,7 +1301,7 @@ function findSlotAtPointer(event) {
 }
 
 function onPointerMove(event) {
-  if (gameOver || isAnimating) return;
+  if (roomGameActive || gameOver || isAnimating) return;
   hoveredSlot = findSlotAtPointer(event);
   canvas.classList.toggle('is-aiming', Boolean(hoveredSlot));
   hintLabel.textContent = hoveredSlot
@@ -1293,6 +1310,7 @@ function onPointerMove(event) {
 }
 
 function onPointerDown(event) {
+  if (roomGameActive) return;
   if (event.target.closest('button, dialog')) return;
   const slot = findSlotAtPointer(event);
   if (slot) insertWeapon(slot);
@@ -1328,6 +1346,55 @@ function startConfiguredGame() {
   showToast(`${players.length}명 · ${MODE_CONFIGS[gameMode].name} 시작!`);
 }
 
+function enterGameStage() {
+  startScreen.hidden = true;
+  gameStage.hidden = false;
+  document.body.classList.add('is-in-game');
+  resize();
+}
+
+function showStartHome() {
+  startHomePanel.hidden = false;
+  hostSetupPanel.hidden = true;
+  roomHostPanel.hidden = true;
+}
+
+function showHostSetup() {
+  startHomePanel.hidden = true;
+  hostSetupPanel.hidden = false;
+  roomHostPanel.hidden = true;
+}
+
+function startLocalGameFromHome() {
+  roomGameActive = false;
+  settingsButton.hidden = false;
+  containerButtons.forEach((button) => { button.disabled = false; });
+  swordButtons.forEach((button) => { button.disabled = false; });
+  players = [
+    { name: '플레이어 1', score: 0, ...PLAYER_COLORS[0] },
+    { name: '플레이어 2', score: 0, ...PLAYER_COLORS[1] },
+  ];
+  gameMode = 'classic';
+  targetScore = 3;
+  roundNumber = 1;
+  roundStarter = 0;
+  resetRound();
+  enterGameStage();
+  showToast('2인 로컬 클래식 게임을 시작합니다');
+}
+
+function captureRoomSettings() {
+  roomCapacity = Math.min(MAX_ROOM_PLAYERS, Math.max(2, Number(roomCapacitySelect.value) || 4));
+  activeRoomSettings = {
+    mode: roomModeButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomMode ?? 'classic',
+    targetScore: Number(roomTargetButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomTarget ?? 3),
+    container: roomContainerButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomContainer ?? 'wood',
+  };
+  gameMode = activeRoomSettings.mode;
+  targetScore = activeRoomSettings.targetScore;
+  if (containerStyle !== activeRoomSettings.container) selectContainer(activeRoomSettings.container);
+}
+
 function connectedRoomPlayers() {
   return [...roomPlayers.values()].filter((player) => player.connected && player.connection?.open);
 }
@@ -1348,11 +1415,14 @@ function roomState(player) {
   return {
     roomCode: activeRoomCode,
     started: roomGameActive,
+    capacity: roomCapacity,
+    settings: activeRoomSettings,
     yourPlayerIndex: player?.playerIndex ?? null,
     players: sortedRoomPlayers().map((candidate) => ({
       playerIndex: candidate.playerIndex,
       name: candidate.name,
       connected: candidate.connected,
+      ready: candidate.ready,
     })),
   };
 }
@@ -1397,28 +1467,56 @@ function sendGameState() {
 
 function renderRoomLobby() {
   const connectedPlayers = connectedRoomPlayers();
-  roomPlayerCount.textContent = `${connectedPlayers.length} / ${MAX_ROOM_PLAYERS}`;
-  if (!roomPlayers.size) {
-    roomPlayerList.innerHTML = '<p>아직 접속한 선원이 없습니다.</p>';
-  } else {
-    roomPlayerList.innerHTML = sortedRoomPlayers().map((player) => `
-      <div class="room-player" style="--player-color:${PLAYER_COLORS[player.playerIndex]?.css ?? '#d7dee5'}">
+  const playersBySeat = new Map(sortedRoomPlayers().map((player) => [player.playerIndex, player]));
+  const readyCount = connectedPlayers.filter((player) => player.ready).length;
+  const roomFull = connectedPlayers.length === roomCapacity;
+  const allReady = roomFull && connectedPlayers.every((player) => player.ready);
+  roomPlayerCount.textContent = `${connectedPlayers.length} / ${roomCapacity}`;
+  roomSettingsSummary.innerHTML = [
+    `${roomCapacity}명`,
+    MODE_CONFIGS[activeRoomSettings.mode]?.name ?? '클래식',
+    `${activeRoomSettings.targetScore}점 승리`,
+    CONTAINER_CONFIGS[activeRoomSettings.container]?.name ?? '오크통',
+  ].map((label) => `<span>${escapeHtml(label)}</span>`).join('');
+  roomPlayerList.innerHTML = Array.from({ length: roomCapacity }, (_, playerIndex) => {
+    const player = playersBySeat.get(playerIndex);
+    if (!player) {
+      return `
+        <div class="room-player room-player--empty">
+          <span class="room-player__badge">P${playerIndex + 1}</span>
+          <strong>빈 좌석</strong>
+          <i>참가 대기</i>
+        </div>
+      `;
+    }
+    const stateLabel = player.connected ? (player.ready ? '준비 완료' : '준비 대기') : '재접속 대기';
+    return `
+      <div class="room-player${player.ready && player.connected ? ' is-ready' : ''}" style="--player-color:${PLAYER_COLORS[player.playerIndex]?.css ?? '#d7dee5'}">
         <span class="room-player__badge">P${player.playerIndex + 1}</span>
         <strong>${escapeHtml(player.name)}</strong>
-        <i>${player.connected ? '접속' : '재접속 대기'}</i>
+        <i>${stateLabel}</i>
       </div>
-    `).join('');
-  }
+    `;
+  }).join('');
 
-  startRoomGameButton.disabled = connectedPlayers.length < MIN_ROOM_PLAYERS || roomGameActive;
+  startRoomGameButton.disabled = !allReady || roomGameActive;
   startRoomGameButton.textContent = roomGameActive
     ? '게임 진행 중'
-    : connectedPlayers.length < MIN_ROOM_PLAYERS
-      ? `선원 ${MIN_ROOM_PLAYERS}명 이상 필요`
-      : `${connectedPlayers.length}명으로 게임 시작`;
+    : !roomFull
+      ? `선원 ${roomCapacity - connectedPlayers.length}명 더 필요`
+      : !allReady
+        ? `${readyCount} / ${roomCapacity} 준비 완료`
+        : '전원 준비 완료 · 게임 시작';
+  roomReadyGuide.textContent = roomGameActive
+    ? '게임이 시작되었습니다. 참가자 휴대폰에서 자기 차례를 진행합니다.'
+    : !roomFull
+      ? `정원 ${roomCapacity}명이 모두 참가해야 준비를 완료할 수 있습니다.`
+      : allReady
+        ? '모든 선원이 준비되었습니다. 방장이 게임을 시작할 수 있습니다.'
+        : `참가자 휴대폰에서 준비 버튼을 눌러 주세요. (${readyCount}/${roomCapacity})`;
   if (remotePeer?.open) {
     remoteStatus.textContent = connectedPlayers.length
-      ? `게임 서버 연결됨 · 선원 ${connectedPlayers.length}명`
+      ? `게임 서버 연결됨 · 선원 ${connectedPlayers.length}/${roomCapacity}명`
       : '게임 서버 연결됨 · 선원 접속 대기';
   }
 }
@@ -1432,6 +1530,13 @@ function handleRemoteMessage(message, player) {
   if (message.type === 'controller-ready') {
     sendToRoomPlayer(player, { type: 'room-state', state: roomState(player) });
     if (roomGameActive) sendToRoomPlayer(player, { type: 'game-state', state: gameState(player) });
+    return;
+  }
+  if (message.type === 'set-ready') {
+    if (roomGameActive) return;
+    player.ready = Boolean(message.ready);
+    renderRoomLobby();
+    sendRoomState();
     return;
   }
   if (!roomGameActive) {
@@ -1468,7 +1573,7 @@ function handleRemoteMessage(message, player) {
 
 function nextRoomPlayerIndex() {
   const occupied = new Set(sortedRoomPlayers().map((player) => player.playerIndex));
-  for (let index = 0; index < MAX_ROOM_PLAYERS; index += 1) {
+  for (let index = 0; index < roomCapacity; index += 1) {
     if (!occupied.has(index)) return index;
   }
   return -1;
@@ -1487,7 +1592,7 @@ function registerRoomPlayer(connection, message) {
   if (!player) {
     const playerIndex = nextRoomPlayerIndex();
     if (playerIndex < 0) {
-      connection.send({ type: 'room-error', reason: '이 방은 선원 6명이 모두 찼습니다.' });
+      connection.send({ type: 'room-error', reason: `이 방은 정원 ${roomCapacity}명이 모두 찼습니다.` });
       window.setTimeout(() => connection.close(), 120);
       return null;
     }
@@ -1497,6 +1602,7 @@ function registerRoomPlayer(connection, message) {
       playerIndex,
       connection,
       connected: true,
+      ready: false,
     };
     roomPlayers.set(clientId, player);
   } else {
@@ -1504,6 +1610,7 @@ function registerRoomPlayer(connection, message) {
     player.name = normalizePlayerName(message.name, player.name);
     player.connection = connection;
     player.connected = true;
+    if (!roomGameActive) player.ready = false;
     if (roomGameActive && players[player.playerIndex]) players[player.playerIndex].name = player.name;
   }
 
@@ -1538,6 +1645,7 @@ function handleRoomConnection(connection) {
   connection.on('close', () => {
     if (!player || player.connection !== connection) return;
     player.connected = false;
+    player.ready = false;
     remoteSelectedSlot = null;
     renderRoomLobby();
     sendRoomState();
@@ -1554,21 +1662,19 @@ function handleRoomConnection(connection) {
   });
 }
 
-function openOnlineDialog() {
-  remoteDialog.showModal();
-  renderRoomLobby();
-}
-
 async function createOnlineRoom() {
   if (remotePeer && !remotePeer.destroyed) return;
+  captureRoomSettings();
   roomCreationAttempt += 1;
-  roomLaunchPanel.hidden = true;
+  startHomePanel.hidden = true;
+  hostSetupPanel.hidden = true;
   roomHostPanel.hidden = false;
   remoteQr.hidden = true;
   remoteLoading.hidden = false;
   remoteLoading.textContent = '게임 서버에 방을 여는 중…';
   remoteStatus.textContent = '게임 서버 연결 중';
   copyRemoteLinkButton.disabled = true;
+  renderRoomLobby();
   activeRoomCode = createRoomCode();
   remoteCode.textContent = activeRoomCode;
 
@@ -1631,7 +1737,8 @@ function closeOnlineRoom() {
   remoteCode.textContent = '------';
   copyRemoteLinkButton.disabled = true;
   roomHostPanel.hidden = true;
-  roomLaunchPanel.hidden = false;
+  hostSetupPanel.hidden = true;
+  startHomePanel.hidden = false;
   slots.forEach((slot) => { slot.userData.label.visible = false; });
   renderRoomLobby();
 }
@@ -1651,7 +1758,7 @@ function joinRoomByCode() {
 
 function startOnlineRoomGame() {
   const connectedPlayers = connectedRoomPlayers().sort((a, b) => a.playerIndex - b.playerIndex);
-  if (connectedPlayers.length < MIN_ROOM_PLAYERS) return;
+  if (connectedPlayers.length !== roomCapacity || !connectedPlayers.every((player) => player.ready)) return;
 
   roomPlayers.forEach((player, clientId) => {
     if (!player.connected) roomPlayers.delete(clientId);
@@ -1662,15 +1769,19 @@ function startOnlineRoomGame() {
     score: 0,
     ...PLAYER_COLORS[playerIndex],
   }));
-  gameMode = modeButtons.find((button) => button.classList.contains('is-selected'))?.dataset.mode ?? 'classic';
-  targetScore = Number(targetButtons.find((button) => button.classList.contains('is-selected'))?.dataset.targetScore ?? 3);
+  gameMode = activeRoomSettings.mode;
+  targetScore = activeRoomSettings.targetScore;
+  if (containerStyle !== activeRoomSettings.container) selectContainer(activeRoomSettings.container);
   roundNumber = 1;
   roundStarter = 0;
   roomGameActive = true;
+  settingsButton.hidden = true;
+  containerButtons.forEach((button) => { button.disabled = true; });
+  swordButtons.forEach((button) => { button.disabled = true; });
   resetRound();
   sendRoomState();
   sendGameState();
-  remoteDialog.close();
+  enterGameStage();
   showToast(`${players.length}명의 온라인 선원으로 게임 시작!`);
 }
 
@@ -1874,11 +1985,34 @@ targetButtons.forEach((button) => button.addEventListener('click', () => {
 }));
 playerCountSelect.addEventListener('change', renderPlayerNameFields);
 $('#start-game-button').addEventListener('click', startConfiguredGame);
-$('#settings-button').addEventListener('click', () => {
+settingsButton.addEventListener('click', () => {
   turnDeadline = 0;
   settingsDialog.showModal();
 });
-$('#remote-button').addEventListener('click', openOnlineDialog);
+showHostSetupButton.addEventListener('click', showHostSetup);
+backStartHomeButton.addEventListener('click', showStartHome);
+startLocalGameButton.addEventListener('click', startLocalGameFromHome);
+roomModeButtons.forEach((button) => button.addEventListener('click', () => {
+  roomModeButtons.forEach((candidate) => {
+    const selected = candidate === button;
+    candidate.classList.toggle('is-selected', selected);
+    candidate.setAttribute('aria-pressed', String(selected));
+  });
+}));
+roomTargetButtons.forEach((button) => button.addEventListener('click', () => {
+  roomTargetButtons.forEach((candidate) => {
+    const selected = candidate === button;
+    candidate.classList.toggle('is-selected', selected);
+    candidate.setAttribute('aria-pressed', String(selected));
+  });
+}));
+roomContainerButtons.forEach((button) => button.addEventListener('click', () => {
+  roomContainerButtons.forEach((candidate) => {
+    const selected = candidate === button;
+    candidate.classList.toggle('is-selected', selected);
+    candidate.setAttribute('aria-pressed', String(selected));
+  });
+}));
 createRoomButton.addEventListener('click', createOnlineRoom);
 joinRoomButton.addEventListener('click', joinRoomByCode);
 joinRoomCodeInput.addEventListener('input', () => {

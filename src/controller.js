@@ -26,7 +26,21 @@ const lobby = document.querySelector('#controller-lobby');
 const lobbyCode = document.querySelector('#controller-lobby-code');
 const seatLabel = document.querySelector('#controller-seat');
 const lobbyPlayerList = document.querySelector('#controller-player-list');
+const roomRules = document.querySelector('#controller-room-rules');
+const readyButton = document.querySelector('#controller-ready-button');
 const gamePanel = document.querySelector('#controller-game');
+
+const modeNames = {
+  classic: '클래식',
+  double: '더블 크라켄',
+  speed: '7초 속전속결',
+  reverse: '역전 모드',
+};
+const containerNames = {
+  wood: '오크통',
+  drum: '코발트 드럼통',
+  powder: '저주받은 화약통',
+};
 
 let peer = null;
 let connection = null;
@@ -37,6 +51,7 @@ let gameLocked = true;
 let joined = false;
 let roomStarted = false;
 let yourPlayerIndex = null;
+let ready = false;
 
 function readLocalValue(key) {
   try {
@@ -87,37 +102,65 @@ function renderSlots() {
   }
 }
 
-function renderRoomPlayers(players = []) {
+function renderRoomPlayers(players = [], capacity = players.length) {
   lobbyPlayerList.replaceChildren();
-  players.forEach((player) => {
+  const playersBySeat = new Map(players.map((player) => [player.playerIndex, player]));
+  for (let playerIndex = 0; playerIndex < capacity; playerIndex += 1) {
+    const player = playersBySeat.get(playerIndex);
     const row = document.createElement('div');
-    row.className = 'room-player';
-    row.style.setProperty('--player-color', playerColors[player.playerIndex] || '#d7dee5');
+    row.className = player ? 'room-player' : 'room-player room-player--empty';
+    if (player?.ready && player.connected) row.classList.add('is-ready');
+    row.style.setProperty('--player-color', playerColors[playerIndex] || '#d7dee5');
 
     const badge = document.createElement('span');
     badge.className = 'room-player__badge';
-    badge.textContent = `P${player.playerIndex + 1}`;
+    badge.textContent = `P${playerIndex + 1}`;
 
     const name = document.createElement('strong');
-    name.textContent = player.playerIndex === yourPlayerIndex ? `${player.name} (나)` : player.name;
+    name.textContent = player
+      ? player.playerIndex === yourPlayerIndex ? `${player.name} (나)` : player.name
+      : '빈 좌석';
 
     const state = document.createElement('i');
-    state.textContent = player.connected ? '접속' : '재접속 대기';
+    state.textContent = player
+      ? player.connected ? (player.ready ? '준비 완료' : '준비 대기') : '재접속 대기'
+      : '참가 대기';
     row.append(badge, name, state);
     lobbyPlayerList.append(row);
-  });
+  }
+}
+
+function updateReadyButton() {
+  readyButton.textContent = ready ? '준비 취소' : '준비 완료';
+  readyButton.classList.toggle('is-ready', ready);
+  readyButton.setAttribute('aria-pressed', String(ready));
+  readyButton.disabled = !joined || roomStarted;
 }
 
 function applyRoomState(state) {
   roomStarted = Boolean(state.started);
   yourPlayerIndex = state.yourPlayerIndex ?? yourPlayerIndex;
+  const capacity = Number(state.capacity) || state.players.length;
+  const me = state.players.find((player) => player.playerIndex === yourPlayerIndex);
+  ready = Boolean(me?.ready);
   seatLabel.textContent = yourPlayerIndex === null ? '선원 등록 중' : `플레이어 ${yourPlayerIndex + 1}`;
   lobbyCode.textContent = state.roomCode || roomCode || '연결됨';
-  renderRoomPlayers(state.players);
+  renderRoomPlayers(state.players, capacity);
+  roomRules.textContent = [
+    `${capacity}명`,
+    modeNames[state.settings?.mode] || '클래식',
+    `${state.settings?.targetScore || 3}점 승리`,
+    containerNames[state.settings?.container] || '오크통',
+  ].join(' · ');
   joinCard.hidden = joined;
   lobby.hidden = !joined || roomStarted;
   gamePanel.hidden = !roomStarted;
-  if (joined && !roomStarted) statusLabel.textContent = '대기실 접속 완료 · 방장이 게임을 시작합니다.';
+  updateReadyButton();
+  if (joined && !roomStarted) {
+    statusLabel.textContent = ready
+      ? '준비 완료 · 다른 선원들을 기다리고 있습니다.'
+      : '대기실 접속 완료 · 준비 버튼을 눌러 주세요.';
+  }
 }
 
 function applyGameState(state) {
@@ -152,6 +195,7 @@ function handleDisconnect(message = '방장과 연결이 끊어졌습니다. 다
   gameLocked = true;
   joined = false;
   roomStarted = false;
+  ready = false;
   connection = null;
   renderSlots();
   insertButton.disabled = true;
@@ -162,12 +206,14 @@ function handleDisconnect(message = '방장과 연결이 끊어졌습니다. 다
   joinButton.disabled = false;
   joinButton.textContent = '다시 연결하기';
   statusLabel.textContent = message;
+  updateReadyButton();
 }
 
 function handleMessage(message) {
   if (!message?.type) return;
   if (message.type === 'room-joined') {
     joined = true;
+    ready = false;
     yourPlayerIndex = message.playerIndex;
     writeLocalValue('kraken-crew-name', message.name);
     joinButton.disabled = false;
@@ -177,6 +223,7 @@ function handleMessage(message) {
     seatLabel.textContent = `플레이어 ${yourPlayerIndex + 1}`;
     statusLabel.textContent = '방 참가 완료 · 대기실 정보를 불러오는 중…';
     send({ type: 'controller-ready' });
+    updateReadyButton();
     return;
   }
   if (message.type === 'room-state') applyRoomState(message.state);
@@ -227,10 +274,22 @@ function connectToRoom() {
 }
 
 renderSlots();
+updateReadyButton();
 
 joinButton.addEventListener('click', connectToRoom);
 nameInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !joinButton.disabled) connectToRoom();
+});
+
+readyButton.addEventListener('click', () => {
+  if (!joined || roomStarted) return;
+  ready = !ready;
+  updateReadyButton();
+  statusLabel.textContent = ready
+    ? '준비 완료 · 다른 선원들을 기다리고 있습니다.'
+    : '준비가 취소되었습니다.';
+  send({ type: 'set-ready', ready });
+  navigator.vibrate?.(ready ? [35, 20, 70] : 20);
 });
 
 weaponButtons.forEach((button) => {

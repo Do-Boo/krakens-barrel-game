@@ -10,13 +10,116 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&amp;family=Noto+Sans+KR:wght@500;700;900&amp;display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
     <main id="app">
-      <canvas id="game-canvas" aria-label="크라켄의 술통 3D 게임"></canvas>
+      <section id="start-screen" class="start-screen">
+        <div class="start-screen__content">
+          <header class="start-brand">
+            <span class="brand__eyebrow">PIRATE PARTY GAME</span>
+            <h1>크라켄의 술통</h1>
+            <p>선원을 모으고, 마지막까지 안전한 구멍을 찾아라.</p>
+          </header>
+
+          <section id="start-home-panel" class="start-panel start-home-panel">
+            <span class="start-panel__eyebrow">START VOYAGE</span>
+            <h2>어떻게 시작할까요?</h2>
+            <button id="show-host-setup" class="start-action start-action--primary" type="button">
+              <span>🌐</span><strong>온라인 서버 열기</strong><small>인원과 규칙을 정하고 선원을 초대합니다</small>
+            </button>
+            <div class="start-join-box">
+              <label for="join-room-code">참가 코드로 들어가기</label>
+              <div class="room-join-row">
+                <input id="join-room-code" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ABC123" aria-label="온라인 방 참가 코드" />
+                <button id="join-room-button" class="secondary-button" type="button">참가</button>
+              </div>
+            </div>
+            <button id="start-local-game" class="start-local-button" type="button">같은 화면에서 로컬 게임 시작</button>
+          </section>
+
+          <section id="host-setup-panel" class="start-panel host-setup-panel" hidden>
+            <div class="start-panel-heading">
+              <button id="back-start-home" type="button" aria-label="처음으로 돌아가기">←</button>
+              <div><span class="start-panel__eyebrow">SERVER SETUP</span><h2>온라인 게임 설정</h2></div>
+            </div>
+
+            <div class="host-setting-row">
+              <label for="room-capacity">참가 인원</label>
+              <select id="room-capacity">
+                <option value="2">2명</option>
+                <option value="3">3명</option>
+                <option value="4" selected>4명</option>
+                <option value="5">5명</option>
+                <option value="6">6명</option>
+              </select>
+            </div>
+
+            <div class="host-setting-group">
+              <span>게임 모드</span>
+              <div class="mode-grid" role="radiogroup" aria-label="온라인 게임 모드">
+                <button class="mode-button is-selected" type="button" data-room-mode="classic" aria-pressed="true"><strong>클래식</strong><span>패배 구멍 1개</span></button>
+                <button class="mode-button" type="button" data-room-mode="double" aria-pressed="false"><strong>더블 크라켄</strong><span>패배 구멍 2개</span></button>
+                <button class="mode-button" type="button" data-room-mode="speed" aria-pressed="false"><strong>7초 속전속결</strong><span>제한 시간 7초</span></button>
+                <button class="mode-button" type="button" data-room-mode="reverse" aria-pressed="false"><strong>역전 모드</strong><span>크라켄을 깨우면 승리</span></button>
+              </div>
+            </div>
+
+            <div class="host-setting-group">
+              <span>승리 목표</span>
+              <div class="target-row" role="radiogroup" aria-label="온라인 승리 목표 점수">
+                <button type="button" data-room-target="1" aria-pressed="false">1점</button>
+                <button class="is-selected" type="button" data-room-target="3" aria-pressed="true">3점</button>
+                <button type="button" data-room-target="5" aria-pressed="false">5점</button>
+              </div>
+            </div>
+
+            <div class="host-setting-group">
+              <span>술통 선택</span>
+              <div class="host-container-row" role="radiogroup" aria-label="온라인 게임 술통 선택">
+                <button class="is-selected" type="button" data-room-container="wood" aria-pressed="true">🪵 오크통</button>
+                <button type="button" data-room-container="drum" aria-pressed="false">🛢️ 드럼통</button>
+                <button type="button" data-room-container="powder" aria-pressed="false">💥 화약통</button>
+              </div>
+            </div>
+
+            <button id="create-room-button" class="start-server-button" type="button">이 설정으로 서버 열기</button>
+          </section>
+
+          <section id="room-host-panel" class="start-panel room-host-panel" hidden>
+            <div class="room-server-status">
+              <span></span>
+              <strong id="remote-status" class="remote-status">게임 서버 연결 중</strong>
+            </div>
+            <div id="room-settings-summary" class="room-settings-summary"></div>
+            <div class="room-share-layout">
+              <div class="remote-qr-shell">
+                <div id="remote-loading" class="remote-loading">방을 만드는 중…</div>
+                <img id="remote-qr" alt="온라인 게임방 참가 QR 코드" hidden />
+              </div>
+              <div class="room-code-card">
+                <span>참가 코드</span>
+                <code id="remote-code" class="remote-code">------</code>
+                <p>QR을 찍거나 6자리 코드를 참가자들에게 알려주세요.</p>
+                <button id="copy-remote-link" class="secondary-button" type="button" disabled>초대 링크 복사</button>
+              </div>
+            </div>
+            <div class="room-lobby-heading">
+              <strong>선원 대기실</strong>
+              <span id="room-player-count">0 / 4</span>
+            </div>
+            <div id="room-player-list" class="room-player-list"></div>
+            <p id="room-ready-guide" class="room-ready-guide">모든 좌석이 채워지고 전원이 준비해야 시작할 수 있습니다.</p>
+            <button id="start-room-game" class="start-server-button" type="button" disabled>선원을 기다리는 중</button>
+            <button id="close-room-button" class="secondary-button room-close-button" type="button">서버 닫기</button>
+          </section>
+        </div>
+      </section>
+
+      <div id="game-stage" class="game-stage" hidden>
+        <canvas id="game-canvas" aria-label="크라켄의 술통 3D 게임"></canvas>
 
       <header class="hud hud--top">
         <div class="brand">
@@ -24,7 +127,6 @@
           <h1>크라켄의 술통</h1>
         </div>
         <div class="header-actions">
-          <button id="remote-button" class="icon-button icon-button--remote" type="button">🌐 온라인 방</button>
           <button id="settings-button" class="icon-button" type="button">⚙ 게임 설정</button>
         </div>
       </header>
@@ -92,6 +194,9 @@
         <button id="play-again-button" type="button">다음 라운드</button>
       </section>
 
+        <footer class="footer-note">드래그해서 회전 · 구멍을 눌러 찌르기</footer>
+      </div>
+
       <dialog id="settings-dialog" class="game-dialog">
         <div class="dialog-heading">
           <div>
@@ -144,54 +249,6 @@
         <button id="start-game-button" class="primary-button" type="button">이 설정으로 시작</button>
       </dialog>
 
-      <dialog id="remote-dialog" class="game-dialog game-dialog--remote">
-        <div class="dialog-heading">
-          <div>
-            <span class="brand__eyebrow">ONLINE CREW</span>
-            <h2>선원들과 온라인 방 만들기</h2>
-          </div>
-          <button class="dialog-close" type="button" data-close-dialog="remote-dialog" aria-label="닫기">×</button>
-        </div>
-        <p class="dialog-description">방장이 게임 화면을 열어두고 참가자들은 휴대폰으로 접속합니다. 자기 차례에만 구멍과 무기를 선택할 수 있습니다.</p>
-
-        <div id="room-launch-panel" class="room-launch-panel">
-          <button id="create-room-button" class="primary-button room-create-button" type="button">새 온라인 방 만들기</button>
-          <div class="room-divider"><span>또는 참가 코드 입력</span></div>
-          <div class="room-join-row">
-            <input id="join-room-code" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ABC123" aria-label="온라인 방 참가 코드" />
-            <button id="join-room-button" class="secondary-button" type="button">참가</button>
-          </div>
-        </div>
-
-        <div id="room-host-panel" class="room-host-panel" hidden>
-          <div class="room-server-status">
-            <span></span>
-            <strong id="remote-status" class="remote-status">게임 서버 연결 중</strong>
-          </div>
-          <div class="room-share-layout">
-            <div class="remote-qr-shell">
-              <div id="remote-loading" class="remote-loading">방을 만드는 중…</div>
-              <img id="remote-qr" alt="온라인 게임방 참가 QR 코드" hidden />
-            </div>
-            <div class="room-code-card">
-              <span>참가 코드</span>
-              <code id="remote-code" class="remote-code">------</code>
-              <p>휴대폰 카메라로 QR을 찍거나 코드를 알려주세요.</p>
-              <button id="copy-remote-link" class="secondary-button" type="button" disabled>초대 링크 복사</button>
-            </div>
-          </div>
-          <div class="room-lobby-heading">
-            <strong>접속한 선원</strong>
-            <span id="room-player-count">0 / 6</span>
-          </div>
-          <div id="room-player-list" class="room-player-list">
-            <p>아직 접속한 선원이 없습니다.</p>
-          </div>
-          <button id="start-room-game" class="primary-button" type="button" disabled>선원 2명 이상 필요</button>
-          <button id="close-room-button" class="secondary-button room-close-button" type="button">방 닫기</button>
-        </div>
-      </dialog>
-
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
       <div id="loading" class="loading">
@@ -199,11 +256,9 @@
         <strong>Meshy 오크통 불러오는 중</strong>
         <span id="loading-progress">0%</span>
       </div>
-
-      <footer class="footer-note">드래그해서 회전 · 구멍을 눌러 찌르기</footer>
     </main>
 
-    <main id="controller-app" class="controller-app" hidden>
+    <div id="controller-app" class="controller-app" hidden>
       <header class="controller-header">
         <span class="brand__eyebrow">KRAKEN CREW</span>
         <h1>크라켄의 선원</h1>
@@ -224,7 +279,9 @@
           <code id="controller-lobby-code">------</code>
         </div>
         <div id="controller-player-list" class="controller-player-list"></div>
-        <p>방장이 게임을 시작할 때까지 기다려주세요.</p>
+        <div id="controller-room-rules" class="controller-room-rules"></div>
+        <button id="controller-ready-button" class="controller-primary-button" type="button">준비 완료</button>
+        <p>모든 선원이 준비하면 방장이 게임을 시작할 수 있습니다.</p>
       </section>
 
       <div id="controller-game" class="controller-game" hidden>
@@ -252,7 +309,7 @@
           <span>칼 꽂기</span><small>선택한 구멍을 공격합니다</small>
         </button>
       </div>
-    </main>
+    </div>
 
     <script type="module" src="/src/bootstrap.js"></script>
   </body>
