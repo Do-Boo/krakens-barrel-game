@@ -70,7 +70,7 @@ const MESHY_ASSETS = {
   wood: { file: 'oak_barrel.glb', kind: 'container' },
   drum: { file: 'blue_drum.glb', kind: 'container' },
   powder: { file: 'powder_barrel.glb', kind: 'container' },
-  pirate: { file: 'pirate_captain.glb', kind: 'pirate' },
+  pirate: { file: 'pirate_captain_expressive.glb', kind: 'pirate' },
   classic: {
     file: 'captain_sword.glb',
     kind: 'weapon',
@@ -287,6 +287,8 @@ const PIRATE_POP_RETREAT = 0.72;
 const PIRATE_FORWARD_YAW = 0;
 const pirateClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const openingClipPoint = new THREE.Vector3();
+const pirateMorphMeshes = [];
+const pirateExpression = { blink: 0, worried: 0, surprised: 0 };
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
@@ -1565,6 +1567,7 @@ function animate(time) {
 
   const openingClipY = openingRim.localToWorld(openingClipPoint.set(0, 0.02, 0)).y;
   pirateClipPlane.constant = -openingClipY;
+  updatePirateExpression(deltaTime);
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
@@ -1650,6 +1653,45 @@ function clipPirateToHead(model) {
   });
 }
 
+function registerPirateExpressions(model) {
+  pirateMorphMeshes.length = 0;
+  model.traverse((object) => {
+    if (!object.isMesh || !object.morphTargetDictionary || !object.morphTargetInfluences) return;
+    pirateMorphMeshes.push(object);
+  });
+}
+
+function updatePirateExpression(deltaTime) {
+  if (!pirateMorphMeshes.length) return;
+
+  const safeSlotCount = Math.max(1, slots.length - triggerSlots.size);
+  const tension = Math.min(1, insertedWeapons.length / safeSlotCount);
+  const blinkCycle = elapsed % 4.8;
+  const blinkTarget = !pirateAwake && blinkCycle > 4.5
+    ? Math.sin(((blinkCycle - 4.5) / 0.3) * Math.PI)
+    : 0;
+  const worriedTarget = pirateAwake
+    ? 0
+    : Math.min(1, tension * 0.82 + fakeoutKick * 0.58);
+  const surprisedTarget = pirateAwake
+    ? Math.min(1, piratePop * 1.7)
+    : Math.sin((1 - fakeoutKick) * Math.PI) * Math.min(0.28, fakeoutKick);
+
+  const follow = (current, target, speed) => (
+    THREE.MathUtils.lerp(current, target, 1 - Math.exp(-speed * deltaTime))
+  );
+  pirateExpression.blink = follow(pirateExpression.blink, blinkTarget, 30);
+  pirateExpression.worried = follow(pirateExpression.worried, worriedTarget, 7);
+  pirateExpression.surprised = follow(pirateExpression.surprised, surprisedTarget, 13);
+
+  pirateMorphMeshes.forEach((mesh) => {
+    const { morphTargetDictionary: dictionary, morphTargetInfluences: influences } = mesh;
+    if (dictionary.Blink !== undefined) influences[dictionary.Blink] = pirateExpression.blink;
+    if (dictionary.Worried !== undefined) influences[dictionary.Worried] = pirateExpression.worried;
+    if (dictionary.Surprised !== undefined) influences[dictionary.Surprised] = pirateExpression.surprised;
+  });
+}
+
 function fitUprightModel(model, targetHeight, targetDiameter = 0) {
   const initialBox = new THREE.Box3().setFromObject(model);
   const scale = targetHeight / initialBox.getSize(new THREE.Vector3()).y;
@@ -1729,6 +1771,7 @@ async function loadMeshyAssets() {
       containerRoots[key].add(model);
     } else if (config.kind === 'pirate') {
       fitUprightModel(model, 1.8);
+      registerPirateExpressions(model);
       clipPirateToHead(model);
       pirate.add(model);
     } else {
