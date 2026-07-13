@@ -71,9 +71,27 @@ const MESHY_ASSETS = {
   drum: { file: 'blue_drum.glb', kind: 'container' },
   powder: { file: 'powder_barrel.glb', kind: 'container' },
   pirate: { file: 'pirate_captain.glb', kind: 'pirate' },
-  classic: { file: 'captain_sword.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
-  cutlass: { file: 'cutlass.glb', kind: 'weapon', axis: 'x', rotation: Math.PI / 2 },
-  dagger: { file: 'kraken_dagger.glb', kind: 'weapon', axis: 'x', rotation: Math.PI / 2 },
+  classic: {
+    file: 'captain_sword.glb',
+    kind: 'weapon',
+    axis: 'x',
+    rotation: -Math.PI / 2,
+    forward: [0.74835, 0.6407, 0.17168],
+  },
+  cutlass: {
+    file: 'cutlass.glb',
+    kind: 'weapon',
+    axis: 'x',
+    rotation: Math.PI / 2,
+    forward: [-0.83008, -0.48776, -0.27029],
+  },
+  dagger: {
+    file: 'kraken_dagger.glb',
+    kind: 'weapon',
+    axis: 'x',
+    rotation: Math.PI / 2,
+    forward: [-0.75071, -0.66063, -0.00018],
+  },
   fish: { file: 'frozen_mackerel.glb', kind: 'weapon', axis: 'z', rotation: 0 },
   carrot: { file: 'legendary_carrot.glb', kind: 'weapon', axis: 'z', rotation: 0 },
   umbrella: { file: 'captain_umbrella.glb', kind: 'weapon', axis: 'y', rotation: -Math.PI / 2 },
@@ -1603,6 +1621,11 @@ function makeWeaponTemplate(model, config) {
 
   if (config.axis === 'x') visual.rotation.y = config.rotation;
   if (config.axis === 'y') visual.rotation.x = config.rotation;
+  if (config.forward) {
+    const measuredForward = new THREE.Vector3(...config.forward).normalize().applyQuaternion(visual.quaternion);
+    const alignment = new THREE.Quaternion().setFromUnitVectors(measuredForward, new THREE.Vector3(0, 0, 1));
+    visual.quaternion.premultiply(alignment);
+  }
 
   let box = new THREE.Box3().setFromObject(visual);
   const size = box.getSize(new THREE.Vector3());
@@ -1610,9 +1633,24 @@ function makeWeaponTemplate(model, config) {
   visual.scale.setScalar(1.9 / length);
   box = new THREE.Box3().setFromObject(visual);
   const scaledSize = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  visual.position.x -= center.x;
-  visual.position.y -= center.y;
+  const tipBandStart = box.max.z - scaledSize.z * 0.055;
+  const tipCenter = new THREE.Vector3();
+  let tipVertexCount = 0;
+  template.updateMatrixWorld(true);
+  model.traverse((object) => {
+    if (!object.isMesh || !object.geometry.attributes.position) return;
+    const positions = object.geometry.attributes.position;
+    for (let index = 0; index < positions.count; index += 1) {
+      const vertex = new THREE.Vector3().fromBufferAttribute(positions, index).applyMatrix4(object.matrixWorld);
+      if (vertex.z < tipBandStart) continue;
+      tipCenter.add(vertex);
+      tipVertexCount += 1;
+    }
+  });
+  if (tipVertexCount) tipCenter.multiplyScalar(1 / tipVertexCount);
+  else box.getCenter(tipCenter);
+  visual.position.x -= tipCenter.x;
+  visual.position.y -= tipCenter.y;
   visual.position.z -= box.min.z + scaledSize.z * 0.42;
   return template;
 }
