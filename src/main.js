@@ -71,8 +71,8 @@ const MESHY_ASSETS = {
   powder: { file: 'powder_barrel.glb', kind: 'container' },
   pirate: { file: 'pirate_captain.glb', kind: 'pirate' },
   classic: { file: 'captain_sword.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
-  cutlass: { file: 'cutlass.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
-  dagger: { file: 'kraken_dagger.glb', kind: 'weapon', axis: 'x', rotation: -Math.PI / 2 },
+  cutlass: { file: 'cutlass.glb', kind: 'weapon', axis: 'x', rotation: Math.PI / 2 },
+  dagger: { file: 'kraken_dagger.glb', kind: 'weapon', axis: 'x', rotation: Math.PI / 2 },
   fish: { file: 'frozen_mackerel.glb', kind: 'weapon', axis: 'z', rotation: 0 },
   carrot: { file: 'legendary_carrot.glb', kind: 'weapon', axis: 'z', rotation: 0 },
   umbrella: { file: 'captain_umbrella.glb', kind: 'weapon', axis: 'y', rotation: -Math.PI / 2 },
@@ -211,6 +211,8 @@ const powderRoot = new THREE.Group();
 powderRoot.visible = false;
 gameRoot.add(powderRoot);
 
+const containerRoots = { wood: barrelRoot, drum: drumRoot, powder: powderRoot };
+
 const slotRoot = new THREE.Group();
 gameRoot.add(slotRoot);
 
@@ -246,6 +248,7 @@ gameRoot.add(pirate);
 const weaponTemplates = new Map();
 
 const raycaster = new THREE.Raycaster();
+const surfaceRaycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const slots = [];
 const insertedWeapons = [];
@@ -530,7 +533,7 @@ function buildSlots() {
           roughness: 0.42,
         }),
       );
-      ring.position.z = -0.025;
+      ring.position.z = -0.013;
       ring.userData.slotGroup = group;
       group.add(ring);
 
@@ -538,7 +541,7 @@ function buildSlots() {
         new THREE.CircleGeometry(0.098, 24),
         new THREE.MeshStandardMaterial({ color: 0x060303, roughness: 1, side: THREE.DoubleSide }),
       );
-      target.position.z = -0.021;
+      target.position.z = -0.011;
       target.userData.slotGroup = group;
       group.add(target);
 
@@ -546,7 +549,7 @@ function buildSlots() {
         new THREE.CircleGeometry(0.2, 20),
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
       );
-      hitArea.position.z = -0.055;
+      hitArea.position.z = -0.035;
       hitArea.userData.slotGroup = group;
       group.add(hitArea);
 
@@ -571,16 +574,50 @@ function buildSlots() {
 
 function updateContainerLayout() {
   const config = CONTAINER_CONFIGS[containerStyle];
+  const containerRoot = containerRoots[containerStyle];
   barrelRoot.visible = containerStyle === 'wood';
   drumRoot.visible = containerStyle === 'drum';
   powderRoot.visible = containerStyle === 'powder';
 
+  scene.updateMatrixWorld(true);
+
   slots.forEach((slot) => {
     const { rowIndex, angle } = slot.userData;
     const height = config.rows[rowIndex];
-    const radius = config.radiusAt(height);
-    slot.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
-    slot.lookAt(0, height, 0);
+    const fallbackRadius = config.radiusAt(height);
+    const outwardLocal = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+    const rayOriginLocal = outwardLocal.clone().multiplyScalar(fallbackRadius + 2);
+    rayOriginLocal.y = height;
+    const rayTargetLocal = new THREE.Vector3(0, height, 0);
+    const rayOriginWorld = gameRoot.localToWorld(rayOriginLocal.clone());
+    const rayTargetWorld = gameRoot.localToWorld(rayTargetLocal.clone());
+    surfaceRaycaster.set(rayOriginWorld, rayTargetWorld.sub(rayOriginWorld).normalize());
+    const surfaceHit = containerRoot.children.length
+      ? surfaceRaycaster.intersectObject(containerRoot, true).find((hit) => hit.object.isMesh)
+      : null;
+
+    if (!surfaceHit) {
+      slot.position.set(outwardLocal.x * fallbackRadius, height, outwardLocal.z * fallbackRadius);
+      slot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), outwardLocal.clone().negate());
+      return;
+    }
+
+    const surfacePointLocal = slotRoot.worldToLocal(surfaceHit.point.clone());
+    const surfaceNormalWorld = surfaceHit.face?.normal
+      ? surfaceHit.face.normal.clone().transformDirection(surfaceHit.object.matrixWorld)
+      : gameRoot.localToWorld(outwardLocal.clone()).sub(gameRoot.localToWorld(new THREE.Vector3())).normalize();
+    const radialWorld = gameRoot.localToWorld(outwardLocal.clone()).sub(gameRoot.localToWorld(new THREE.Vector3())).normalize();
+    if (surfaceNormalWorld.dot(radialWorld) < 0) surfaceNormalWorld.negate();
+    const parentWorldQuaternion = slotRoot.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const measuredNormalLocal = surfaceNormalWorld.applyQuaternion(parentWorldQuaternion).normalize();
+    const rowDirection = Math.sign(height - config.height * 0.5);
+    const curveTilt = containerStyle === 'drum' || rowDirection === 0
+      ? 0
+      : rowDirection * THREE.MathUtils.clamp(Math.abs(measuredNormalLocal.y), 0.08, 0.28);
+    const surfaceNormalLocal = new THREE.Vector3(outwardLocal.x, curveTilt, outwardLocal.z).normalize();
+
+    slot.position.copy(surfacePointLocal).addScaledVector(surfaceNormalLocal, 0.006);
+    slot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), surfaceNormalLocal.clone().negate());
   });
 
   const openingScale = config.openingRadius / 0.57;
@@ -1521,7 +1558,6 @@ function makeWeaponTemplate(model, config) {
 
 async function loadMeshyAssets() {
   const entries = Object.entries(MESHY_ASSETS);
-  const roots = { wood: barrelRoot, drum: drumRoot, powder: powderRoot };
   let completed = 0;
   loading.querySelector('strong').textContent = 'Meshy 에셋 10종을 불러오는 중';
 
@@ -1535,7 +1571,7 @@ async function loadMeshyAssets() {
       const containerConfig = CONTAINER_CONFIGS[key];
       const targetDiameter = containerConfig.radiusAt(containerConfig.height * 0.5) * 2;
       fitUprightModel(model, containerConfig.height, targetDiameter);
-      roots[key].add(model);
+      containerRoots[key].add(model);
     } else if (config.kind === 'pirate') {
       fitUprightModel(model, 1.8);
       pirate.add(model);
