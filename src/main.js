@@ -276,9 +276,9 @@ openingRoot.add(openingRim);
 gameRoot.add(openingRoot);
 
 const pirate = new THREE.Group();
-const PIRATE_REST_SCALE = 0.62;
-const PIRATE_POP_SCALE = 0.82;
-const PIRATE_REST_DEPTH = 0.74;
+const PIRATE_REST_SCALE = 0.94;
+const PIRATE_POP_SCALE = 1.38;
+const PIRATE_REST_DEPTH = 1.27;
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
@@ -1503,15 +1503,16 @@ function animate(time) {
   impactKick = Math.max(0, impactKick - deltaTime * 4.8);
   fakeoutKick = Math.max(0, fakeoutKick - deltaTime * 1.7);
   const totalKick = Math.max(impactKick, fakeoutKick * 0.72);
+  const baseFov = pirateAwake ? 45 : 38;
   if (totalKick > 0) {
     gameRoot.rotation.z = Math.sin(elapsed * (impactKick > 0 ? 62 : 24)) * totalKick * 0.025;
     gameRoot.position.y = Math.abs(Math.sin(elapsed * 48)) * totalKick * 0.04;
-    camera.fov += ((38 + totalKick * 0.9) - camera.fov) * 0.18;
+    camera.fov += ((baseFov + totalKick * 0.9) - camera.fov) * 0.18;
     camera.updateProjectionMatrix();
   } else {
     gameRoot.rotation.z *= 0.7;
     gameRoot.position.y *= 0.7;
-    camera.fov += (38 - camera.fov) * 0.12;
+    camera.fov += (baseFov - camera.fov) * 0.12;
     camera.updateProjectionMatrix();
   }
 
@@ -1523,7 +1524,7 @@ function animate(time) {
       ? pop / 0.92
       : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
     pirate.scale.setScalar(THREE.MathUtils.lerp(PIRATE_REST_SCALE, PIRATE_POP_SCALE, Math.max(0, overshoot)));
-    pirate.position.y = pirateBaseY + pop * 1.22 + Math.sin(piratePop * Math.PI) * 0.28;
+    pirate.position.y = pirateBaseY + pop * 0.98 + Math.sin(piratePop * Math.PI) * 0.28;
     pirate.rotation.y = Math.sin(elapsed * 4.5) * 0.16;
     pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.2) * (1 - piratePop) * 0.12;
   } else if (fakeoutKick > 0) {
