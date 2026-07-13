@@ -276,10 +276,11 @@ openingRoot.add(openingRim);
 gameRoot.add(openingRoot);
 
 const pirate = new THREE.Group();
-const PIRATE_REST_SCALE = 0.94;
-const PIRATE_POP_SCALE = PIRATE_REST_SCALE * 30;
-const PIRATE_REST_DEPTH = 1.27;
+const PIRATE_SIZE_MULTIPLIER = 5;
+const PIRATE_REST_SCALE = 0.94 * PIRATE_SIZE_MULTIPLIER;
+const PIRATE_POP_SCALE = 1.38 * PIRATE_SIZE_MULTIPLIER;
 const PIRATE_FACE_ANCHOR_Y = 1.45;
+const PIRATE_REST_DEPTH = PIRATE_FACE_ANCHOR_Y * PIRATE_REST_SCALE - 0.1;
 const PIRATE_RETREAT_PER_SCALE = 0.22;
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
@@ -1138,7 +1139,7 @@ function endRound({ winnerIndex, loserIndex, reason }) {
   resultCopy.textContent = reason;
   resultScores.innerHTML = players.map((player) => `<span>${escapeHtml(player.name)} ${player.score}점</span>`).join('');
   resultButton.textContent = matchFinished ? '새 매치 시작' : '다음 라운드';
-  window.setTimeout(triggerPirate, pirateAwake ? 820 : 190);
+  window.setTimeout(triggerPirate, pirateAwake ? 650 : 190);
   updateHud();
   sendGameState();
 }
