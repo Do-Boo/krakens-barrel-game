@@ -98,7 +98,7 @@ const MESHY_ASSETS = {
     kind: 'weapon',
     axis: 'z',
     rotation: 0,
-    forward: [0.00103, -0.54763, -0.83672],
+    forward: [-0.00103, 0.54763, 0.83672],
   },
   umbrella: { file: 'captain_umbrella.glb', kind: 'weapon', axis: 'y', rotation: -Math.PI / 2 },
 };
