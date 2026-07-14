@@ -157,7 +157,8 @@
           <h1>크라켄의 술통</h1>
         </div>
         <div class="header-actions">
-          <button id="settings-button" class="icon-button" type="button">⚙ 게임 설정</button>
+          <button id="loadout-toggle" class="icon-button loadout-toggle" type="button" aria-label="장비 선택" aria-controls="loadout-panel" aria-expanded="false"><span class="icon-button__glyph" aria-hidden="true">⚔</span><span class="icon-button__text">장비 선택</span></button>
+          <button id="settings-button" class="icon-button" type="button" aria-label="게임 설정"><span class="icon-button__glyph" aria-hidden="true">⚙</span><span class="icon-button__text">게임 설정</span></button>
         </div>
       </header>
 
@@ -171,7 +172,14 @@
 
       <section id="scoreboard" class="scoreboard" aria-label="플레이어 점수"></section>
 
-      <aside class="loadout-panel" aria-label="게임 스타일 선택">
+      <aside id="loadout-panel" class="loadout-panel" aria-labelledby="loadout-panel-title">
+        <div class="loadout-panel__heading">
+          <div>
+            <span>CAPTAIN'S LOADOUT</span>
+            <strong id="loadout-panel-title">장비 선택</strong>
+          </div>
+          <button id="loadout-close" class="dialog-close loadout-close" type="button" aria-label="장비 선택 닫기">×</button>
+        </div>
         <div class="loadout-group">
           <span class="loadout-group__label">통 선택</span>
           <div class="choice-row choice-row--containers" role="group" aria-label="통 선택">
@@ -198,6 +206,7 @@
           </div>
         </div>
       </aside>
+      <button id="loadout-backdrop" class="loadout-backdrop" type="button" aria-label="장비 선택 닫기" hidden></button>
 
       <section class="turn-card" aria-live="polite">
         <div id="player-badge" class="player-badge">P1</div>

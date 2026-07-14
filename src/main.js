@@ -34,6 +34,10 @@ const resultScores = $('#result-scores');
 const resultButton = $('#play-again-button');
 const settingsDialog = $('#settings-dialog');
 const settingsButton = $('#settings-button');
+const loadoutPanel = $('#loadout-panel');
+const loadoutToggle = $('#loadout-toggle');
+const loadoutClose = $('#loadout-close');
+const loadoutBackdrop = $('#loadout-backdrop');
 const playerCountSelect = $('#player-count');
 const playerNameFields = $('#player-name-fields');
 const startScreen = $('#start-screen');
@@ -204,6 +208,7 @@ let lastTimerSecond = null;
 let matchFinished = false;
 let toastTimeout = null;
 let audioContext = null;
+let loadoutOpen = false;
 const firedFakeouts = new Set();
 
 const scene = new THREE.Scene();
@@ -1412,10 +1417,28 @@ function startConfiguredGame() {
 }
 
 function enterGameStage() {
+  setLoadoutOpen(false);
   startScreen.hidden = true;
   gameStage.hidden = false;
   document.body.classList.add('is-in-game');
   resize();
+}
+
+function syncLoadoutState() {
+  const isMobile = window.innerWidth <= 600;
+  if (!isMobile) loadoutOpen = false;
+  const isOpen = isMobile && loadoutOpen;
+  document.body.classList.toggle('is-loadout-open', isOpen);
+  loadoutToggle.setAttribute('aria-expanded', String(isOpen));
+  loadoutBackdrop.hidden = !isOpen;
+  loadoutPanel.inert = isMobile && !isOpen;
+  if (isMobile) loadoutPanel.setAttribute('aria-hidden', String(!isOpen));
+  else loadoutPanel.removeAttribute('aria-hidden');
+}
+
+function setLoadoutOpen(open) {
+  loadoutOpen = Boolean(open && window.innerWidth <= 600);
+  syncLoadoutState();
 }
 
 function showStartHome() {
@@ -1997,8 +2020,10 @@ function resize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   camera.aspect = width / height;
+  camera.zoom = width <= 600 && height > width ? 0.76 : 1;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
+  syncLoadoutState();
 }
 
 function updateTimer(time) {
@@ -2210,7 +2235,10 @@ canvas.addEventListener('pointerleave', () => {
 });
 
 containerButtons.forEach((button) => button.addEventListener('click', () => selectContainer(button.dataset.container)));
-swordButtons.forEach((button) => button.addEventListener('click', () => selectSword(button.dataset.sword)));
+swordButtons.forEach((button) => button.addEventListener('click', () => {
+  selectSword(button.dataset.sword);
+  if (window.innerWidth <= 600) setLoadoutOpen(false);
+}));
 modeButtons.forEach((button) => button.addEventListener('click', () => {
   modeButtons.forEach((candidate) => {
     const selected = candidate === button;
@@ -2228,8 +2256,15 @@ targetButtons.forEach((button) => button.addEventListener('click', () => {
 playerCountSelect.addEventListener('change', renderPlayerNameFields);
 $('#start-game-button').addEventListener('click', startConfiguredGame);
 settingsButton.addEventListener('click', () => {
+  setLoadoutOpen(false);
   turnDeadline = 0;
   settingsDialog.showModal();
+});
+loadoutToggle.addEventListener('click', () => setLoadoutOpen(!loadoutOpen));
+loadoutClose.addEventListener('click', () => setLoadoutOpen(false));
+loadoutBackdrop.addEventListener('click', () => setLoadoutOpen(false));
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && loadoutOpen) setLoadoutOpen(false);
 });
 showHostSetupButton.addEventListener('click', showHostSetup);
 backStartHomeButton.addEventListener('click', showStartHome);
