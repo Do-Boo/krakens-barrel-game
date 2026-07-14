@@ -1488,6 +1488,7 @@ function gameState(player) {
     tension: insertedWeapons.length / Math.max(1, slots.length),
     gameOver,
     isAnimating,
+    container: activeRoomSettings.container || containerStyle,
     swordStyle,
     roundNumber,
     players: players.map((candidate, playerIndex) => ({

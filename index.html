@@ -315,9 +315,17 @@
             <button type="button" data-remote-weapon="umbrella" aria-label="선장의 우산"><img src="/assets/ui/icon-weapon-umbrella.png" alt="" /></button>
           </div>
         </section>
-        <section>
-          <h2>구멍 선택</h2>
-          <div id="controller-slots" class="controller-slots"></div>
+        <section class="controller-target-section">
+          <div class="controller-target-heading">
+            <h2>통을 보며 구멍 선택</h2>
+            <strong id="controller-container-name">오크통</strong>
+          </div>
+          <div id="controller-barrel-target" class="controller-barrel-target" data-container="wood">
+            <img id="controller-container-preview" class="controller-container-preview" src="/assets/ui/icon-container-wood.png" alt="오크통" />
+            <img id="controller-aim-weapon" class="controller-aim-weapon" src="/assets/ui/icon-weapon-classic.png" alt="" aria-hidden="true" hidden />
+            <div id="controller-slots" class="controller-slots" role="group" aria-label="통의 칼 구멍 선택"></div>
+          </div>
+          <p id="controller-target-guide" class="controller-target-guide">통 위의 구멍을 누르면 칼끝이 해당 위치를 조준합니다.</p>
         </section>
         <button id="controller-insert" class="controller-insert" type="button" disabled>
           <span>칼 꽂기</span><small>선택한 구멍을 공격합니다</small>

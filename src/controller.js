@@ -17,6 +17,11 @@ const playerLabel = document.querySelector('#controller-player');
 const tensionFill = document.querySelector('#controller-tension span');
 const slotRoot = document.querySelector('#controller-slots');
 const insertButton = document.querySelector('#controller-insert');
+const barrelTarget = document.querySelector('#controller-barrel-target');
+const containerPreview = document.querySelector('#controller-container-preview');
+const containerNameLabel = document.querySelector('#controller-container-name');
+const targetGuide = document.querySelector('#controller-target-guide');
+const aimWeapon = document.querySelector('#controller-aim-weapon');
 const weaponButtons = [...document.querySelectorAll('[data-remote-weapon]')];
 const joinCard = document.querySelector('#controller-join-card');
 const roomCodeLabel = document.querySelector('#controller-room-code');
@@ -29,6 +34,7 @@ const lobbyPlayerList = document.querySelector('#controller-player-list');
 const roomRules = document.querySelector('#controller-room-rules');
 const readyButton = document.querySelector('#controller-ready-button');
 const gamePanel = document.querySelector('#controller-game');
+const controllerApp = document.querySelector('#controller-app');
 
 const modeNames = {
   classic: '클래식',
@@ -41,6 +47,24 @@ const containerNames = {
   drum: '코발트 드럼통',
   powder: '저주받은 화약통',
 };
+const containerVisuals = {
+  wood: '/assets/ui/icon-container-wood.png',
+  drum: '/assets/ui/icon-container-drum.png',
+  powder: '/assets/ui/icon-container-powder.png',
+};
+const weaponVisuals = {
+  classic: '/assets/ui/icon-weapon-classic.png',
+  cutlass: '/assets/ui/icon-weapon-cutlass.png',
+  dagger: '/assets/ui/icon-weapon-dagger.png',
+  fish: '/assets/ui/icon-weapon-fish.png',
+  carrot: '/assets/ui/icon-weapon-carrot.png',
+  umbrella: '/assets/ui/icon-weapon-umbrella.png',
+};
+const slotPositions = [
+  [23, 31], [36.5, 27.5], [50, 26], [63.5, 27.5], [77, 31],
+  [17, 49], [30.2, 45.5], [43.4, 44], [56.6, 44], [69.8, 45.5], [83, 49],
+  [23, 67], [36.5, 70.5], [50, 72], [63.5, 70.5], [77, 67],
+];
 
 let peer = null;
 let connection = null;
@@ -52,6 +76,12 @@ let joined = false;
 let roomStarted = false;
 let yourPlayerIndex = null;
 let ready = false;
+let containerStyle = 'wood';
+let selectedWeapon = 'classic';
+
+function setGameView(active) {
+  controllerApp.classList.toggle('is-game-active', active);
+}
 
 function readLocalValue(key) {
   try {
@@ -83,23 +113,58 @@ function send(message) {
   if (connection?.open) connection.send(message);
 }
 
+function updateContainerVisual(style = 'wood') {
+  if (!Object.hasOwn(containerVisuals, style)) return;
+  containerStyle = style;
+  barrelTarget.dataset.container = style;
+  containerPreview.src = containerVisuals[style];
+  containerPreview.alt = containerNames[style];
+  containerNameLabel.textContent = containerNames[style];
+}
+
+function updateAimWeapon(style = 'classic') {
+  if (!Object.hasOwn(weaponVisuals, style)) return;
+  selectedWeapon = style;
+  aimWeapon.src = weaponVisuals[style];
+}
+
+function updateAimPosition() {
+  const position = slotPositions[selectedSlot];
+  aimWeapon.hidden = !position;
+  if (!position) return;
+  barrelTarget.style.setProperty('--aim-x', `${position[0]}%`);
+  barrelTarget.style.setProperty('--aim-y', `${position[1]}%`);
+  targetGuide.textContent = `${String(selectedSlot + 1).padStart(2, '0')}번 구멍 조준 완료 · 아래의 칼 꽂기 버튼을 누르세요.`;
+}
+
 function renderSlots() {
   slotRoot.replaceChildren();
   for (let index = 0; index < slotCount; index += 1) {
+    const position = slotPositions[index] || [50, 50];
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = String(index + 1).padStart(2, '0');
+    button.dataset.slotIndex = String(index);
+    button.style.setProperty('--slot-x', `${position[0]}%`);
+    button.style.setProperty('--slot-y', `${position[1]}%`);
+    button.classList.toggle('is-used', usedSlots.includes(index));
     button.disabled = usedSlots.includes(index) || gameLocked;
     button.classList.toggle('is-selected', selectedSlot === index);
+    button.setAttribute('aria-label', usedSlots.includes(index)
+      ? `${index + 1}번 구멍, 이미 사용됨`
+      : `${index + 1}번 구멍 조준`);
     button.addEventListener('click', () => {
       selectedSlot = index;
       renderSlots();
       insertButton.disabled = gameLocked;
+      gamePanel.classList.remove('is-inserting');
+      updateAimPosition();
       send({ type: 'select-slot', slotIndex: index });
       navigator.vibrate?.(20);
     });
     slotRoot.append(button);
   }
+  updateAimPosition();
 }
 
 function renderRoomPlayers(players = [], capacity = players.length) {
@@ -139,6 +204,7 @@ function updateReadyButton() {
 
 function applyRoomState(state) {
   roomStarted = Boolean(state.started);
+  setGameView(roomStarted);
   yourPlayerIndex = state.yourPlayerIndex ?? yourPlayerIndex;
   const capacity = Number(state.capacity) || state.players.length;
   const me = state.players.find((player) => player.playerIndex === yourPlayerIndex);
@@ -152,6 +218,7 @@ function applyRoomState(state) {
     `${state.settings?.targetScore || 3}점 승리`,
     containerNames[state.settings?.container] || '오크통',
   ].join(' · ');
+  updateContainerVisual(state.settings?.container || containerStyle);
   joinCard.hidden = joined;
   lobby.hidden = !joined || roomStarted;
   gamePanel.hidden = !roomStarted;
@@ -166,10 +233,14 @@ function applyRoomState(state) {
 function applyGameState(state) {
   if (state.roomStarted === false) return;
   roomStarted = true;
+  setGameView(true);
   yourPlayerIndex = state.yourPlayerIndex ?? yourPlayerIndex;
   usedSlots = state.usedSlots ?? [];
   slotCount = state.slotCount ?? 16;
   gameLocked = !state.canAct;
+  updateContainerVisual(state.container || containerStyle);
+  updateAimWeapon(state.swordStyle || selectedWeapon);
+  gamePanel.classList.toggle('is-inserting', Boolean(state.isAnimating));
   tensionFill.style.width = `${Math.round((state.tension ?? 0) * 100)}%`;
   playerLabel.textContent = state.isYourTurn
     ? `${state.currentPlayerName ?? '내'} 차례입니다!`
@@ -179,7 +250,18 @@ function applyGameState(state) {
     : state.isYourTurn
       ? '내 차례 · 무기와 구멍을 선택해 주세요.'
       : '다른 선원의 차례를 지켜보고 있습니다.';
-  if (selectedSlot !== null && usedSlots.includes(selectedSlot)) selectedSlot = null;
+  if (selectedSlot !== null && usedSlots.includes(selectedSlot)) {
+    selectedSlot = null;
+    targetGuide.textContent = state.gameOver
+      ? '라운드가 끝났습니다.'
+      : '칼이 꽂혔습니다. 다음 차례를 기다려 주세요.';
+  } else if (selectedSlot === null) {
+    targetGuide.textContent = state.gameOver
+      ? '라운드가 끝났습니다.'
+      : state.isYourTurn
+        ? '통 위의 구멍을 누르면 칼끝이 해당 위치를 조준합니다.'
+        : '다른 선원이 고르는 구멍을 지켜보세요.';
+  }
   insertButton.disabled = selectedSlot === null || gameLocked;
   weaponButtons.forEach((button) => {
     button.disabled = gameLocked;
@@ -196,7 +278,9 @@ function handleDisconnect(message = '방장과 연결이 끊어졌습니다. 다
   joined = false;
   roomStarted = false;
   ready = false;
+  selectedSlot = null;
   connection = null;
+  setGameView(false);
   renderSlots();
   insertButton.disabled = true;
   weaponButtons.forEach((button) => { button.disabled = true; });
@@ -297,6 +381,7 @@ weaponButtons.forEach((button) => {
   button.addEventListener('click', () => {
     if (gameLocked) return;
     weaponButtons.forEach((candidate) => candidate.classList.toggle('is-selected', candidate === button));
+    updateAimWeapon(button.dataset.remoteWeapon);
     send({ type: 'select-weapon', style: button.dataset.remoteWeapon });
     navigator.vibrate?.(15);
   });
@@ -304,6 +389,8 @@ weaponButtons.forEach((button) => {
 
 insertButton.addEventListener('click', () => {
   if (selectedSlot === null || gameLocked) return;
+  gamePanel.classList.add('is-inserting');
+  targetGuide.textContent = `${String(selectedSlot + 1).padStart(2, '0')}번 구멍에 칼을 꽂는 중…`;
   send({ type: 'insert-slot', slotIndex: selectedSlot });
   insertButton.disabled = true;
   navigator.vibrate?.([35, 25, 70]);
