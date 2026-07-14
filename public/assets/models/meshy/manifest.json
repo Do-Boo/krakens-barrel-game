@@ -6,7 +6,7 @@
     { "key": "wood", "file": "oak_barrel.glb", "meshyTaskId": "019f58eb-f5e1-7153-aedc-69eeb7b346af" },
     { "key": "drum", "file": "blue_drum.glb", "meshyTaskId": "019f58eb-f764-7d1e-9c9d-cebec1de6630" },
     { "key": "powder", "file": "powder_barrel.glb", "meshyTaskId": "019f58eb-f6a2-755c-8695-afedf7d5979d" },
-    { "key": "pirate", "file": "pirate_captain_expressive.glb", "sourceFile": "pirate_captain.glb", "expressionPipeline": "Blender shape keys: Blink, Worried, Surprised", "meshyTaskId": "019f5ab7-371f-7b89-a395-0cf63227e7b8", "previewTaskId": "019f5aae-e871-7019-8c8c-744df4b36a1b", "refineTaskId": "019f5ab7-371f-7b89-a395-0cf63227e7b8" },
+    { "key": "pirate", "file": "pirate_captain_expressive.glb", "sourceFile": "pirate_captain.glb", "expressionPipeline": "Blender shape keys: Blink, Worried, Surprised; 17-bone rig; PirateIdle and PirateReveal clips", "meshyTaskId": "019f5ab7-371f-7b89-a395-0cf63227e7b8", "previewTaskId": "019f5aae-e871-7019-8c8c-744df4b36a1b", "refineTaskId": "019f5ab7-371f-7b89-a395-0cf63227e7b8" },
     { "key": "classic", "file": "captain_sword.glb", "meshyTaskId": "019f58eb-f8e4-7fd1-9d52-b03f79ad01dd" },
     { "key": "cutlass", "file": "cutlass.glb", "meshyTaskId": "019f58eb-f9a5-755c-90f9-f65e9d6397f3" },
     { "key": "dagger", "file": "kraken_dagger.glb", "meshyTaskId": "019f58eb-fa78-7fd2-8b74-fa798cfaa6a0" },

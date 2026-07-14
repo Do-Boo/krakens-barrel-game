@@ -323,6 +323,9 @@ const pirateRevealTargetEnd = new THREE.Vector3();
 const pirateRevealHorizontal = new THREE.Vector3();
 const pirateMorphMeshes = [];
 const pirateExpression = { blink: 0, worried: 0, surprised: 0 };
+let pirateMixer = null;
+let pirateIdleAction = null;
+let pirateRevealAction = null;
 pirate.scale.setScalar(PIRATE_REST_SCALE);
 gameRoot.add(pirate);
 
@@ -1191,6 +1194,13 @@ function beginPirateReveal() {
   pirateRevealCameraEnd.y += 5.1;
   controls.enabled = false;
   document.body.classList.add('is-pirate-reveal');
+  if (pirateRevealAction) {
+    pirateRevealAction.reset();
+    pirateRevealAction.setEffectiveTimeScale(1.45);
+    pirateRevealAction.setEffectiveWeight(1);
+    pirateRevealAction.play();
+    if (pirateIdleAction?.isRunning()) pirateIdleAction.crossFadeTo(pirateRevealAction, 0.12, false);
+  }
   playTone(92, 0.75, 'sawtooth', 0.09);
   playTone(185, 0.42, 'square', 0.05, 0.12);
   playTone(48, 0.9, 'sine', 0.08, 0.05);
@@ -1251,6 +1261,12 @@ function resetRound() {
   }
   pirateRevealCameraCaptured = false;
   controls.enabled = true;
+  pirateRevealAction?.stop();
+  if (pirateIdleAction) {
+    pirateIdleAction.reset();
+    pirateIdleAction.setEffectiveWeight(1);
+    pirateIdleAction.play();
+  }
   gameOver = false;
   isAnimating = false;
   hoveredSlot = null;
@@ -1994,6 +2010,7 @@ function animate(time) {
 
   const openingClipY = openingRim.localToWorld(openingClipPoint.set(0, 0.02, 0)).y;
   pirateClipPlane.constant = -openingClipY;
+  pirateMixer?.update(deltaTime);
   updatePirateExpression(deltaTime);
 
   renderer.render(scene, camera);
@@ -2121,6 +2138,22 @@ function registerPirateExpressions(model) {
   });
 }
 
+function registerPirateAnimations(model, clips) {
+  pirateMixer = new THREE.AnimationMixer(model);
+  const idleClip = THREE.AnimationClip.findByName(clips, 'PirateIdle');
+  const revealClip = THREE.AnimationClip.findByName(clips, 'PirateReveal');
+  pirateIdleAction = idleClip ? pirateMixer.clipAction(idleClip) : null;
+  pirateRevealAction = revealClip ? pirateMixer.clipAction(revealClip) : null;
+  if (pirateIdleAction) {
+    pirateIdleAction.setLoop(THREE.LoopRepeat, Infinity);
+    pirateIdleAction.play();
+  }
+  if (pirateRevealAction) {
+    pirateRevealAction.setLoop(THREE.LoopOnce, 1);
+    pirateRevealAction.clampWhenFinished = true;
+  }
+}
+
 function updatePirateExpression(deltaTime) {
   if (!pirateMorphMeshes.length) return;
 
@@ -2232,6 +2265,7 @@ async function loadMeshyAssets() {
     } else if (config.kind === 'pirate') {
       fitUprightModel(model, 1.8);
       registerPirateExpressions(model);
+      registerPirateAnimations(model, gltf.animations);
       clipPirateToHead(model);
       pirate.add(model);
     } else {
