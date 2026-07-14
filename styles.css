@@ -1,8 +1,11 @@
 :root {
   color: #f9f5e8;
   background: #0d3b50;
-  font-family: 'Noto Sans KR', system-ui, sans-serif;
+  font-family: 'Gowun Dodum', 'Noto Sans KR', system-ui, sans-serif;
   font-synthesis: none;
+  --font-display: 'Black And White Picture', 'Jua', sans-serif;
+  --font-ui: 'Jua', 'Noto Sans KR', sans-serif;
+  --font-body: 'Gowun Dodum', 'Noto Sans KR', sans-serif;
   --gold: #f3c860;
   --cyan: #4bd7e7;
   --panel: rgba(9, 35, 49, 0.76);
@@ -71,7 +74,7 @@ body::before {
 
 .start-brand h1 {
   margin: 3px 0 5px;
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(38px, 7vw, 70px);
   font-weight: 400;
   letter-spacing: -0.05em;
@@ -303,7 +306,7 @@ button {
 
 .brand h1 {
   margin: 0;
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(27px, 4vw, 46px);
   font-weight: 400;
   letter-spacing: -0.04em;
@@ -1235,7 +1238,7 @@ button {
 
 .controller-header h1 {
   margin: 0;
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-display);
   font-size: 32px;
   font-weight: 400;
 }
@@ -1652,7 +1655,7 @@ body::before {
 
 .start-panel h2 {
   color: #fff1c4;
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-ui);
   font-size: 29px;
   font-weight: 400;
   letter-spacing: -0.025em;
@@ -1689,7 +1692,7 @@ body::before {
 }
 
 .start-action strong {
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-ui);
   font-size: 19px;
   font-weight: 400;
 }
@@ -1849,7 +1852,7 @@ body::before {
   color: #281407;
   background: #e2a83f;
   box-shadow: inset 0 -5px 0 rgba(99, 48, 14, 0.22), 0 4px 0 #251006;
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-ui);
   font-size: 16px;
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -2102,7 +2105,7 @@ body::before {
 .result-card h2,
 .dialog-heading h2 {
   color: #4a2110;
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 400;
 }
 
@@ -2254,7 +2257,7 @@ body::before {
   color: #281407;
   background: #e2a83f;
   box-shadow: inset 0 -6px 0 rgba(99, 48, 14, 0.22), 0 6px 0 #251006, 0 18px 35px rgba(0, 0, 0, 0.35);
-  font-family: 'Black Han Sans', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 400;
 }
 
@@ -2920,4 +2923,67 @@ body::before {
     width: 72px;
     height: auto;
   }
+}
+
+/* Pirate typography pass */
+body {
+  font-family: var(--font-body);
+}
+
+button {
+  font-family: var(--font-ui);
+}
+
+input,
+select,
+code,
+.start-action small,
+.mode-button > span,
+.room-code-card p,
+.turn-card__label,
+.hint-card p {
+  font-family: var(--font-body);
+}
+
+.start-brand h1,
+.brand h1,
+.controller-header h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.015em;
+}
+
+.start-brand h1 {
+  line-height: 1.02;
+  -webkit-text-stroke: 1px #32180b;
+  text-shadow: 0 3px 0 #8b4d1e, 0 7px 0 #35170a, 0 15px 32px rgba(0, 0, 0, 0.78);
+}
+
+.brand h1,
+.controller-header h1 {
+  -webkit-text-stroke: 0.6px #2b1508;
+}
+
+.start-panel h2,
+.start-action strong,
+.mode-button strong,
+.start-server-button,
+.controller-primary-button,
+.primary-button,
+.turn-card strong,
+.result-card h2,
+.dialog-heading h2,
+.controller-insert span {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.brand__eyebrow,
+.start-panel__eyebrow,
+.loadout-group__label,
+.settings-label,
+.tension-panel__row,
+.room-lobby-heading {
+  font-family: 'Noto Sans KR', sans-serif;
 }
