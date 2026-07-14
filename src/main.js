@@ -1856,7 +1856,10 @@ async function createOnlineRoom() {
   peer.on('disconnected', () => {
     if (remotePeer !== peer || peer.destroyed) return;
     remoteStatus.textContent = '선원 모집소 재연결 중…';
-    window.setTimeout(() => peer.reconnect(), 600);
+    window.setTimeout(() => {
+      if (remotePeer !== peer || peer.destroyed || !peer.disconnected) return;
+      peer.reconnect();
+    }, 600);
   });
   peer.on('error', (error) => {
     console.error(error);
