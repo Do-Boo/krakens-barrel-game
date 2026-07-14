@@ -11,6 +11,7 @@ import {
   normalizeRoomCode,
   roomPeerId,
 } from './room-protocol.js';
+import { RoomDirectory } from './room-directory.js';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#game-canvas');
@@ -33,6 +34,10 @@ const resultScores = $('#result-scores');
 const resultButton = $('#play-again-button');
 const settingsDialog = $('#settings-dialog');
 const settingsButton = $('#settings-button');
+const loadoutPanel = $('#loadout-panel');
+const loadoutToggle = $('#loadout-toggle');
+const loadoutClose = $('#loadout-close');
+const loadoutBackdrop = $('#loadout-backdrop');
 const playerCountSelect = $('#player-count');
 const playerNameFields = $('#player-name-fields');
 const startScreen = $('#start-screen');
@@ -61,6 +66,12 @@ const roomSettingsSummary = $('#room-settings-summary');
 const roomReadyGuide = $('#room-ready-guide');
 const startRoomGameButton = $('#start-room-game');
 const closeRoomButton = $('#close-room-button');
+const roomTitleInput = $('#room-title');
+const activeRoomTitle = $('#active-room-title');
+const openRoomList = $('#open-room-list');
+const roomDirectoryStatus = $('#room-directory-status');
+const refreshRoomListButton = $('#refresh-room-list');
+const randomRoomButton = $('#random-room-button');
 const toast = $('#toast');
 const containerButtons = [...document.querySelectorAll('[data-container]')];
 const swordButtons = [...document.querySelectorAll('[data-sword]')];
@@ -163,6 +174,12 @@ const CONTAINER_CONFIGS = {
   },
 };
 
+const CONTAINER_ICONS = {
+  wood: '/assets/ui/icon-container-wood.png',
+  drum: '/assets/ui/icon-container-drum.png',
+  powder: '/assets/ui/icon-container-powder.png',
+};
+
 let players = [
   { name: '플레이어 1', score: 0, ...PLAYER_COLORS[0] },
   { name: '플레이어 2', score: 0, ...PLAYER_COLORS[1] },
@@ -191,6 +208,7 @@ let lastTimerSecond = null;
 let matchFinished = false;
 let toastTimeout = null;
 let audioContext = null;
+let loadoutOpen = false;
 const firedFakeouts = new Set();
 
 const scene = new THREE.Scene();
@@ -342,13 +360,18 @@ let remoteLink = '';
 let activeRoomCode = '';
 let roomGameActive = false;
 let roomCreationAttempt = 0;
+let gameCanvasStream = null;
 let roomCapacity = 4;
 let activeRoomSettings = {
+  title: '크라켄 사냥 원정대',
   mode: 'classic',
   targetScore: 3,
   container: 'wood',
 };
 const roomPlayers = new Map();
+const roomDirectory = new RoomDirectory();
+let directoryRooms = [];
+let directoryStatus = 'connecting';
 
 function createDrumContainer() {
   const root = new THREE.Group();
@@ -1394,27 +1417,129 @@ function startConfiguredGame() {
 }
 
 function enterGameStage() {
+  setLoadoutOpen(false);
   startScreen.hidden = true;
   gameStage.hidden = false;
   document.body.classList.add('is-in-game');
   resize();
 }
 
+function syncLoadoutState() {
+  const isMobile = window.innerWidth <= 600;
+  if (!isMobile) loadoutOpen = false;
+  const isOpen = isMobile && loadoutOpen;
+  document.body.classList.toggle('is-loadout-open', isOpen);
+  loadoutToggle.setAttribute('aria-expanded', String(isOpen));
+  loadoutBackdrop.hidden = !isOpen;
+  loadoutPanel.inert = isMobile && !isOpen;
+  if (isMobile) loadoutPanel.setAttribute('aria-hidden', String(!isOpen));
+  else loadoutPanel.removeAttribute('aria-hidden');
+}
+
+function setLoadoutOpen(open) {
+  loadoutOpen = Boolean(open && window.innerWidth <= 600);
+  syncLoadoutState();
+}
+
+function resetStartScreenScroll() {
+  startScreen.scrollTop = 0;
+}
+
 function showStartHome() {
   startHomePanel.hidden = false;
   hostSetupPanel.hidden = true;
   roomHostPanel.hidden = true;
+  resetStartScreenScroll();
 }
 
 function showHostSetup() {
   startHomePanel.hidden = true;
   hostSetupPanel.hidden = false;
   roomHostPanel.hidden = true;
+  resetStartScreenScroll();
+}
+
+function normalizeRoomTitle(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, 24) || '크라켄 사냥 원정대';
+}
+
+function navigateToRoom(roomCode) {
+  const normalized = normalizeRoomCode(roomCode);
+  if (normalized.length !== 6) return;
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.searchParams.set('room', normalized);
+  window.location.assign(url);
+}
+
+function availableDirectoryRooms() {
+  return directoryRooms.filter((room) => !room.started && room.playerCount < room.capacity);
+}
+
+function renderOpenRooms() {
+  const availableRooms = availableDirectoryRooms();
+  randomRoomButton.disabled = availableRooms.length === 0;
+  roomDirectoryStatus.textContent = directoryStatus === 'online'
+    ? availableRooms.length
+      ? `지금 ${availableRooms.length}개 선단이 새 선원을 기다리고 있습니다.`
+      : '현재 모집 중인 공개 선단이 없습니다.'
+    : directoryStatus === 'electing'
+      ? '새 항구지기를 정하는 중…'
+      : '열린 선단을 찾는 중…';
+
+  if (!directoryRooms.length) {
+    openRoomList.innerHTML = `
+      <div class="open-room-empty">
+        <strong>모집 중인 선단이 없습니다</strong>
+        <span>첫 번째 공개 선단을 만들어 보세요.</span>
+      </div>
+    `;
+    return;
+  }
+
+  openRoomList.innerHTML = directoryRooms.slice(0, 8).map((room) => {
+    const isFull = room.playerCount >= room.capacity;
+    const canJoin = !room.started && !isFull;
+    const status = room.started ? '항해 중' : isFull ? '정원 마감' : '모집 중';
+    return `
+      <article class="open-room-card${canJoin ? '' : ' is-unavailable'}">
+        <img src="${CONTAINER_ICONS[room.container] || CONTAINER_ICONS.wood}" alt="" />
+        <div class="open-room-card__copy">
+          <strong>${escapeHtml(room.title)}</strong>
+          <div class="open-room-card__rules">
+            <span>${escapeHtml(MODE_CONFIGS[room.mode]?.name ?? '클래식')}</span>
+            <span>${room.targetScore}점 승리</span>
+            <span>${escapeHtml(CONTAINER_CONFIGS[room.container]?.name ?? '오크통')}</span>
+          </div>
+        </div>
+        <div class="open-room-card__state">
+          <b>${room.playerCount}/${room.capacity}</b>
+          <span>${status}</span>
+        </div>
+        <button class="secondary-button open-room-join" type="button" data-join-open-room="${room.roomCode}"${canJoin ? '' : ' disabled'}>${canJoin ? '승선' : status}</button>
+      </article>
+    `;
+  }).join('');
+}
+
+function publishRoomListing() {
+  if (!activeRoomCode || !remotePeer?.open) return;
+  roomDirectory.publish({
+    roomCode: activeRoomCode,
+    title: activeRoomSettings.title,
+    capacity: roomCapacity,
+    playerCount: connectedRoomPlayers().length,
+    mode: activeRoomSettings.mode,
+    targetScore: activeRoomSettings.targetScore,
+    container: activeRoomSettings.container,
+    started: roomGameActive,
+  });
 }
 
 function startLocalGameFromHome() {
   roomGameActive = false;
   settingsButton.hidden = false;
+  loadoutToggle.hidden = false;
   containerButtons.forEach((button) => { button.disabled = false; });
   swordButtons.forEach((button) => { button.disabled = false; });
   players = [
@@ -1432,7 +1557,15 @@ function startLocalGameFromHome() {
 
 function captureRoomSettings() {
   roomCapacity = Math.min(MAX_ROOM_PLAYERS, Math.max(2, Number(roomCapacitySelect.value) || 4));
+  const title = normalizeRoomTitle(roomTitleInput.value);
+  roomTitleInput.value = title;
+  try {
+    localStorage.setItem('kraken-room-title', title);
+  } catch {
+    // Storage is optional; the title still applies to this room.
+  }
   activeRoomSettings = {
+    title,
     mode: roomModeButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomMode ?? 'classic',
     targetScore: Number(roomTargetButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomTarget ?? 3),
     container: roomContainerButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomContainer ?? 'wood',
@@ -1456,6 +1589,48 @@ function sendToRoomPlayer(player, message) {
 
 function sendRemote(message) {
   connectedRoomPlayers().forEach((player) => sendToRoomPlayer(player, message));
+}
+
+function getGameCanvasStream() {
+  if (gameCanvasStream?.active) return gameCanvasStream;
+  if (typeof canvas.captureStream !== 'function') return null;
+  try {
+    gameCanvasStream = canvas.captureStream(18);
+    const [videoTrack] = gameCanvasStream.getVideoTracks();
+    if (videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint = 'motion';
+    return gameCanvasStream;
+  } catch (error) {
+    console.warn('The live 3D game view could not be captured.', error);
+    return null;
+  }
+}
+
+function closePlayerGameStream(player) {
+  const mediaCall = player?.mediaCall;
+  if (!mediaCall) return;
+  player.mediaCall = null;
+  mediaCall.close();
+}
+
+function streamGameToPlayer(player) {
+  if (!player?.connected || !player.connection?.open || !remotePeer?.open) return;
+  const stream = getGameCanvasStream();
+  if (!stream) {
+    sendToRoomPlayer(player, { type: 'game-stream-unavailable' });
+    return;
+  }
+  closePlayerGameStream(player);
+  const mediaCall = remotePeer.call(player.connection.peer, stream, {
+    metadata: { role: 'game-view', roomCode: activeRoomCode },
+  });
+  player.mediaCall = mediaCall;
+  mediaCall.on('close', () => {
+    if (player.mediaCall === mediaCall) player.mediaCall = null;
+  });
+  mediaCall.on('error', (error) => {
+    console.warn(`Live game view failed for ${player.name}.`, error);
+    if (player.mediaCall === mediaCall) player.mediaCall = null;
+  });
 }
 
 function roomState(player) {
@@ -1488,6 +1663,7 @@ function gameState(player) {
     tension: insertedWeapons.length / Math.max(1, slots.length),
     gameOver,
     isAnimating,
+    container: activeRoomSettings.container || containerStyle,
     swordStyle,
     roundNumber,
     players: players.map((candidate, playerIndex) => ({
@@ -1518,6 +1694,7 @@ function renderRoomLobby() {
   const readyCount = connectedPlayers.filter((player) => player.ready).length;
   const roomFull = connectedPlayers.length === roomCapacity;
   const allReady = roomFull && connectedPlayers.every((player) => player.ready);
+  activeRoomTitle.textContent = activeRoomSettings.title;
   roomPlayerCount.textContent = `${connectedPlayers.length} / ${roomCapacity}`;
   roomSettingsSummary.innerHTML = [
     `${roomCapacity}명`,
@@ -1566,6 +1743,7 @@ function renderRoomLobby() {
       ? `모집소 열림 · 선원 ${connectedPlayers.length}/${roomCapacity}명`
       : '모집소 열림 · 선원 접속 대기';
   }
+  publishRoomListing();
 }
 
 function rejectRoomAction(player, reason) {
@@ -1574,6 +1752,10 @@ function rejectRoomAction(player, reason) {
 
 function handleRemoteMessage(message, player) {
   if (!message?.type) return;
+  if (message.type === 'request-game-stream') {
+    streamGameToPlayer(player);
+    return;
+  }
   if (message.type === 'controller-ready') {
     sendToRoomPlayer(player, { type: 'room-state', state: roomState(player) });
     if (roomGameActive) sendToRoomPlayer(player, { type: 'game-state', state: gameState(player) });
@@ -1650,9 +1832,11 @@ function registerRoomPlayer(connection, message) {
       connection,
       connected: true,
       ready: false,
+      mediaCall: null,
     };
     roomPlayers.set(clientId, player);
   } else {
+    closePlayerGameStream(player);
     if (player.connection?.open && player.connection !== connection) player.connection.close();
     player.name = normalizePlayerName(message.name, player.name);
     player.connection = connection;
@@ -1671,6 +1855,9 @@ function registerRoomPlayer(connection, message) {
   renderRoomLobby();
   sendRoomState();
   if (roomGameActive) sendGameState();
+  window.setTimeout(() => {
+    if (player.connected && player.connection === connection) streamGameToPlayer(player);
+  }, 120);
   showToast(`${player.name} 선원이 방에 참가했습니다`);
   return player;
 }
@@ -1693,6 +1880,7 @@ function handleRoomConnection(connection) {
     if (!player || player.connection !== connection) return;
     player.connected = false;
     player.ready = false;
+    closePlayerGameStream(player);
     remoteSelectedSlot = null;
     renderRoomLobby();
     sendRoomState();
@@ -1716,6 +1904,7 @@ async function createOnlineRoom() {
   startHomePanel.hidden = true;
   hostSetupPanel.hidden = true;
   roomHostPanel.hidden = false;
+  resetStartScreenScroll();
   remoteQr.hidden = true;
   remoteLoading.hidden = false;
   remoteLoading.textContent = '초대장을 만드는 중…';
@@ -1751,7 +1940,10 @@ async function createOnlineRoom() {
   peer.on('disconnected', () => {
     if (remotePeer !== peer || peer.destroyed) return;
     remoteStatus.textContent = '선원 모집소 재연결 중…';
-    window.setTimeout(() => peer.reconnect(), 600);
+    window.setTimeout(() => {
+      if (remotePeer !== peer || peer.destroyed || !peer.disconnected) return;
+      peer.reconnect();
+    }, 600);
   });
   peer.on('error', (error) => {
     console.error(error);
@@ -1768,8 +1960,10 @@ async function createOnlineRoom() {
 }
 
 function closeOnlineRoom() {
+  roomDirectory.clear(activeRoomCode);
   connectedRoomPlayers().forEach((player) => {
     sendToRoomPlayer(player, { type: 'room-closed', reason: '방장이 온라인 방을 닫았습니다.' });
+    closePlayerGameStream(player);
     player.connection.close();
   });
   roomPlayers.clear();
@@ -1786,6 +1980,7 @@ function closeOnlineRoom() {
   roomHostPanel.hidden = true;
   hostSetupPanel.hidden = true;
   startHomePanel.hidden = false;
+  resetStartScreenScroll();
   slots.forEach((slot) => { slot.userData.label.visible = false; });
   renderRoomLobby();
 }
@@ -1797,10 +1992,7 @@ function joinRoomByCode() {
     joinRoomCodeInput.focus();
     return;
   }
-  const url = new URL(window.location.href);
-  url.search = '';
-  url.searchParams.set('room', roomCode);
-  window.location.assign(url);
+  navigateToRoom(roomCode);
 }
 
 function startOnlineRoomGame() {
@@ -1822,7 +2014,9 @@ function startOnlineRoomGame() {
   roundNumber = 1;
   roundStarter = 0;
   roomGameActive = true;
+  renderRoomLobby();
   settingsButton.hidden = true;
+  loadoutToggle.hidden = true;
   containerButtons.forEach((button) => { button.disabled = true; });
   swordButtons.forEach((button) => { button.disabled = true; });
   resetRound();
@@ -1836,8 +2030,10 @@ function resize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   camera.aspect = width / height;
+  camera.zoom = width <= 600 && height > width ? 0.76 : 1;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
+  syncLoadoutState();
 }
 
 function updateTimer(time) {
@@ -2021,8 +2217,26 @@ buildSlots();
 renderPlayerNameFields();
 resetRound();
 resize();
+try {
+  roomTitleInput.value = normalizeRoomTitle(localStorage.getItem('kraken-room-title') || roomTitleInput.value);
+} catch {
+  roomTitleInput.value = normalizeRoomTitle(roomTitleInput.value);
+}
+renderOpenRooms();
+roomDirectory.addEventListener('status', (event) => {
+  directoryStatus = event.detail;
+  renderOpenRooms();
+});
+roomDirectory.addEventListener('rooms', (event) => {
+  directoryRooms = event.detail;
+  renderOpenRooms();
+});
+roomDirectory.start();
 window.addEventListener('resize', resize);
-window.addEventListener('beforeunload', () => remotePeer?.destroy());
+window.addEventListener('beforeunload', () => {
+  roomDirectory.stop();
+  remotePeer?.destroy();
+});
 canvas.addEventListener('pointerdown', onPointerDown);
 canvas.addEventListener('pointermove', onPointerMove);
 canvas.addEventListener('pointerleave', () => {
@@ -2031,7 +2245,10 @@ canvas.addEventListener('pointerleave', () => {
 });
 
 containerButtons.forEach((button) => button.addEventListener('click', () => selectContainer(button.dataset.container)));
-swordButtons.forEach((button) => button.addEventListener('click', () => selectSword(button.dataset.sword)));
+swordButtons.forEach((button) => button.addEventListener('click', () => {
+  selectSword(button.dataset.sword);
+  if (window.innerWidth <= 600) setLoadoutOpen(false);
+}));
 modeButtons.forEach((button) => button.addEventListener('click', () => {
   modeButtons.forEach((candidate) => {
     const selected = candidate === button;
@@ -2049,12 +2266,29 @@ targetButtons.forEach((button) => button.addEventListener('click', () => {
 playerCountSelect.addEventListener('change', renderPlayerNameFields);
 $('#start-game-button').addEventListener('click', startConfiguredGame);
 settingsButton.addEventListener('click', () => {
+  setLoadoutOpen(false);
   turnDeadline = 0;
   settingsDialog.showModal();
+});
+loadoutToggle.addEventListener('click', () => setLoadoutOpen(!loadoutOpen));
+loadoutClose.addEventListener('click', () => setLoadoutOpen(false));
+loadoutBackdrop.addEventListener('click', () => setLoadoutOpen(false));
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && loadoutOpen) setLoadoutOpen(false);
 });
 showHostSetupButton.addEventListener('click', showHostSetup);
 backStartHomeButton.addEventListener('click', showStartHome);
 startLocalGameButton.addEventListener('click', startLocalGameFromHome);
+refreshRoomListButton.addEventListener('click', () => roomDirectory.refresh());
+randomRoomButton.addEventListener('click', () => {
+  const rooms = availableDirectoryRooms();
+  const room = rooms[Math.floor(Math.random() * rooms.length)];
+  if (room) navigateToRoom(room.roomCode);
+});
+openRoomList.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-join-open-room]');
+  if (button && !button.disabled) navigateToRoom(button.dataset.joinOpenRoom);
+});
 roomModeButtons.forEach((button) => button.addEventListener('click', () => {
   roomModeButtons.forEach((candidate) => {
     const selected = candidate === button;
