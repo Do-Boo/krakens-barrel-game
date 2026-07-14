@@ -3286,3 +3286,419 @@ code,
     padding-inline: 17px;
   }
 }
+
+/* Visual QA pass: scale the illustrated UI and cover the remaining CSS-only cards. */
+.tension-panel,
+.hint-card,
+.score-chip {
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-status-chip) center / 100% 100% no-repeat;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.tension-panel {
+  width: min(270px, 27vw);
+  min-height: 64px;
+  padding: 13px 22px 15px;
+  filter: drop-shadow(0 5px 1px rgba(21, 8, 3, 0.5));
+}
+
+.tension-panel__row {
+  margin-bottom: 8px;
+  color: #e9d3a3;
+  font-size: 10px;
+}
+
+.scoreboard {
+  min-width: 190px;
+  gap: 8px;
+}
+
+.score-chip {
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 16px;
+  color: #ead7ab;
+  font-size: 11px;
+  filter: drop-shadow(0 4px 1px rgba(21, 8, 3, 0.48));
+}
+
+.score-chip.is-current {
+  color: #fff0c5;
+  background: var(--ui-status-chip) center / 100% 100% no-repeat;
+  box-shadow: inset 4px 0 0 var(--player-color);
+  filter: brightness(1.12) drop-shadow(0 4px 1px rgba(21, 8, 3, 0.52));
+}
+
+.score-chip__badge {
+  width: 28px;
+  height: 28px;
+}
+
+.hint-card {
+  max-width: 236px;
+  min-height: 64px;
+  padding: 13px 22px;
+  filter: drop-shadow(0 5px 1px rgba(21, 8, 3, 0.5));
+}
+
+.hint-card p {
+  color: #ead7ab;
+  font-size: 12px;
+}
+
+.turn-card {
+  min-width: min(500px, calc(100vw - 32px));
+  min-height: 92px;
+  padding: 17px 28px;
+  border: 0;
+  border-radius: 0;
+  color: #32190a;
+  background: var(--ui-input-parchment) center / 100% 100% no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 7px 1px rgba(31, 13, 5, 0.62));
+  backdrop-filter: none;
+}
+
+.player-badge {
+  width: 52px;
+  height: 52px;
+}
+
+.turn-card__label {
+  color: rgba(65, 36, 15, 0.66);
+  font-size: 11px;
+}
+
+.turn-card strong {
+  font-size: 18px;
+}
+
+.room-code-card {
+  min-height: 100%;
+  padding: 24px 28px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-input-parchment) center / 100% 100% no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 4px 1px rgba(25, 10, 3, 0.42));
+}
+
+.room-code-card > span,
+.room-code-card p {
+  color: rgba(69, 38, 16, 0.68);
+}
+
+.remote-code {
+  margin: 8px 0 11px;
+  font-size: 30px;
+}
+
+.remote-qr-shell {
+  padding: 15px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: var(--ui-button-square-selected) center / 100% 100% no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 5px 1px rgba(25, 10, 3, 0.48));
+}
+
+.remote-qr-shell img {
+  padding: 4px;
+  background: white;
+}
+
+.room-settings-summary {
+  gap: 7px;
+}
+
+.room-settings-summary span {
+  min-height: 30px;
+  padding: 8px 16px;
+  font-size: 10px;
+}
+
+.room-player {
+  min-height: 52px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 0;
+  color: #f1ddb0;
+  background: var(--ui-choice-card) center / 100% 100% no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 3px 1px rgba(20, 8, 3, 0.42));
+}
+
+.room-player.is-ready {
+  border: 0;
+  color: #e8f7d7;
+  background:
+    linear-gradient(rgba(27, 119, 62, 0.42), rgba(12, 75, 39, 0.46)),
+    var(--ui-choice-card) center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.room-player--empty {
+  border: 0;
+  opacity: 0.7;
+}
+
+.room-player strong {
+  font-size: 11px;
+}
+
+.room-player i {
+  font-size: 10px;
+}
+
+.controller-card,
+.controller-game > .controller-card {
+  padding: 20px 24px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-choice-card) center / 100% 100% no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 5px 1px rgba(20, 8, 3, 0.48));
+}
+
+.controller-card > span {
+  color: #d9c18d;
+}
+
+.controller-card strong {
+  color: #fff0c3;
+}
+
+.controller-primary-button.is-ready {
+  color: #f8e7b9;
+  background-image: var(--ui-button-secondary) !important;
+}
+
+.controller-weapons button {
+  height: 52px;
+}
+
+.result-scores span {
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 0;
+  color: #f1ddae;
+  background: var(--ui-status-chip) center / 100% 100% no-repeat;
+}
+
+.result-card {
+  isolation: isolate;
+  width: min(390px, calc(100vw - 48px));
+  padding: 34px 38px;
+  border: 0;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0, rgba(255, 255, 255, 0.24), transparent 38%),
+    #ead49c;
+  box-shadow: 16px 22px 58px rgba(0, 0, 0, 0.58);
+}
+
+.result-card::before {
+  position: absolute;
+  inset: -24px -22px;
+  z-index: 0;
+  pointer-events: none;
+  background: url('/assets/ui/menu-frame.png') center / 100% 100% no-repeat;
+  content: '';
+}
+
+.result-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+:is(
+  .start-server-button,
+  .controller-primary-button,
+  .primary-button,
+  .controller-insert,
+  .secondary-button,
+  .sword-choice,
+  .controller-weapons button,
+  .controller-slots button,
+  .choice-button
+):disabled {
+  filter: grayscale(0.55) saturate(0.64);
+  opacity: 0.72;
+}
+
+@media (min-width: 1001px) {
+  .start-screen__content:has(#host-setup-panel:not([hidden])),
+  .start-screen__content:has(#room-host-panel:not([hidden])) {
+    grid-template-columns: minmax(0, 820px);
+  }
+
+  #host-setup-panel,
+  #room-host-panel {
+    width: min(760px, 100%);
+  }
+
+  .room-share-layout {
+    grid-template-columns: 205px minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .remote-qr-shell {
+    width: 205px;
+    height: 205px;
+  }
+
+  .loadout-panel {
+    width: 276px;
+    padding: 17px;
+  }
+
+  .choice-button {
+    min-height: 60px;
+  }
+
+  .choice-button img {
+    width: 42px;
+    height: 36px;
+  }
+
+  .sword-choice {
+    height: 48px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .start-screen__content {
+    grid-template-columns: minmax(380px, 0.86fr) minmax(560px, 1.14fr);
+    width: min(1280px, calc(100% - 72px));
+  }
+
+  .start-home-panel {
+    width: min(580px, 100%);
+    max-width: 580px;
+  }
+}
+
+@media (max-width: 820px) {
+  .tension-panel {
+    width: 200px;
+    min-height: 58px;
+  }
+
+  .scoreboard {
+    min-width: 176px;
+  }
+
+  .score-chip {
+    min-height: 44px;
+  }
+
+  .loadout-panel {
+    width: 218px;
+  }
+}
+
+@media (max-width: 600px) {
+  #host-setup-panel,
+  #room-host-panel {
+    padding: 30px 22px;
+  }
+
+  #host-setup-panel .mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #host-setup-panel .mode-button {
+    grid-template-columns: 44px minmax(0, 1fr);
+    min-height: 62px;
+    gap: 2px 6px;
+    padding: 5px 7px 5px 5px;
+  }
+
+  #host-setup-panel .mode-button > img {
+    width: 42px;
+    height: 42px;
+  }
+
+  #host-setup-panel .mode-button strong {
+    font-size: 10px;
+  }
+
+  #host-setup-panel .mode-button span {
+    font-size: 8px;
+  }
+
+  .room-share-layout {
+    gap: 8px;
+  }
+
+  .remote-qr-shell {
+    width: 128px;
+    height: 128px;
+    padding: 9px;
+  }
+
+  .room-code-card {
+    min-height: 120px;
+    padding: 15px 22px;
+  }
+
+  .remote-code {
+    font-size: 26px;
+  }
+
+  .room-player {
+    min-height: 42px;
+    padding: 6px 10px;
+  }
+
+  .room-player-list {
+    gap: 3px;
+  }
+
+  .room-host-panel {
+    gap: 10px;
+  }
+
+  .room-ready-guide {
+    font-size: 9px;
+  }
+
+  .tension-panel {
+    width: 174px;
+    min-height: 54px;
+    padding: 11px 17px 13px;
+  }
+
+  .scoreboard {
+    min-width: 164px;
+  }
+
+  .score-chip {
+    min-height: 42px;
+    padding: 7px 13px;
+  }
+
+  .loadout-panel {
+    width: 184px;
+  }
+
+  .hint-card {
+    min-height: 58px;
+  }
+
+  .turn-card {
+    min-width: calc(100vw - 24px);
+    min-height: 84px;
+    padding: 14px 22px;
+  }
+
+  .player-badge {
+    width: 46px;
+    height: 46px;
+  }
+}
