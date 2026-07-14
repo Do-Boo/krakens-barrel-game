@@ -78,6 +78,32 @@ Legendary carrot: One legendary orange carrot comedy dagger, long straight taper
 Captain umbrella: One complete closed pirate captain umbrella, tightly wrapped deep-navy fabric, long straight shaft, pointed aged-brass ferrule at one end, curved dark-wood handle at the opposite end and a tiny coral tie. Angle handle bottom-left to tip top-right.
 ```
 
+## Illustrated control kit
+
+Every control frame is intentionally blank. Button labels, room codes, form values, focus states and click targets remain accessible live HTML layered over the image asset.
+
+```text
+Primary button: A wide blank pirate tavern button, about 4:1, with a glowing amber-gold painted wood center, chunky dark-walnut rim, aged-brass corner guards and small rivets.
+
+Secondary button: A wide blank pirate tavern button, about 4:1, with a deep navy-teal painted wood center, chunky dark-walnut rim, aged-brass corner guards and small rivets.
+
+Danger button: A wide blank pirate tavern button, about 4:1, with a coral-red painted wood center, blackened-walnut rim, dark aged-brass corners and small rivets.
+
+Square icon button: A blank square pirate tavern icon-button frame with a deep navy-teal painted wood center, chunky dark-walnut rim, aged-brass corners and rivets.
+
+Selected square icon button: A blank selected-state square pirate tavern icon-button frame with a bright amber-gold painted wood center, glowing inner rim, chunky dark-walnut outer rim, aged-brass corners and rivets.
+
+Choice card: A wide blank unselected choice card, about 3:1, made from nearly black navy-painted walnut with a thin dark-walnut rim and restrained aged-brass corner pins.
+
+Selected choice card: A wide blank selected choice card, about 3:1, with an amber-gold painted wood center, dark-walnut rim and aged-brass corner pins.
+
+Parchment input: A wide blank pirate tavern text input, about 4:1, with a warm cream parchment writing area, dark-walnut inset rim and aged-brass corner caps. Use a flat #ff00ff chroma-key background so the cream parchment remains opaque.
+
+Status chip: A slim blank dark-walnut plaque, about 5:1, with a thin aged-brass rim and round end rivets.
+```
+
+Shared constraints: front-facing and horizontal, generous empty center, no text, letters, numerals, symbols, icons, logos or watermark. Isolate on a perfectly flat chroma-key background with no floor, cast shadow, gradient, texture or vignette.
+
 ## Chroma-key conversion
 
 ```bash

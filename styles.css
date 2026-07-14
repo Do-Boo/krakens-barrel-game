@@ -2987,3 +2987,302 @@ code,
 .room-lobby-heading {
   font-family: 'Noto Sans KR', sans-serif;
 }
+
+/* Illustrated control kit: image frames stay visual while labels remain live HTML. */
+:root {
+  --ui-button-primary: url('/assets/ui/button-primary.png');
+  --ui-button-secondary: url('/assets/ui/button-secondary.png');
+  --ui-button-danger: url('/assets/ui/button-danger.png');
+  --ui-button-square: url('/assets/ui/button-square.png');
+  --ui-button-square-selected: url('/assets/ui/button-square-selected.png');
+  --ui-choice-card: url('/assets/ui/choice-card.png');
+  --ui-choice-card-selected: url('/assets/ui/choice-card-selected.png');
+  --ui-input-parchment: url('/assets/ui/input-parchment.png');
+  --ui-status-chip: url('/assets/ui/status-chip.png');
+}
+
+.start-action,
+.start-server-button,
+.controller-primary-button,
+.primary-button,
+.controller-insert,
+.result-card button {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-button-primary) center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  color: #2b1608;
+  filter: drop-shadow(0 5px 1px rgba(24, 10, 3, 0.52));
+}
+
+.start-action {
+  padding: 15px 24px;
+}
+
+.start-server-button,
+.controller-primary-button,
+.primary-button,
+.result-card button {
+  padding-inline: 30px;
+}
+
+.controller-insert {
+  padding-inline: 34px;
+}
+
+.secondary-button,
+.icon-button,
+.start-local-button {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-button-secondary) center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #f8e7b9;
+  filter: drop-shadow(0 4px 1px rgba(20, 8, 3, 0.48));
+}
+
+.secondary-button,
+.icon-button {
+  padding-inline: 20px;
+}
+
+.start-local-button {
+  width: 100%;
+  min-height: 56px;
+  padding: 7px 24px;
+  border-bottom: 0;
+}
+
+.room-close-button {
+  border: 0 !important;
+  background: var(--ui-button-danger) center / 100% 100% no-repeat !important;
+  color: #fff0c9;
+}
+
+.start-panel-heading > button,
+.dialog-close,
+.sword-choice,
+.controller-weapons button,
+.controller-slots button,
+.choice-button {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-button-square) center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #f5dfae;
+  filter: drop-shadow(0 3px 1px rgba(22, 9, 3, 0.48));
+}
+
+.start-panel-heading > button,
+.dialog-close {
+  color: #fff0c4;
+  font-size: 18px;
+}
+
+.choice-button.is-selected,
+.sword-choice.is-selected,
+.controller-weapons button.is-selected,
+.controller-slots button.is-selected {
+  background-image: var(--ui-button-square-selected) !important;
+  color: #2b1608;
+  filter: drop-shadow(0 3px 1px rgba(22, 9, 3, 0.52)) brightness(1.02);
+}
+
+.mode-button,
+.target-row button,
+.host-container-row button {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-choice-card) center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #f3dfb3;
+  filter: drop-shadow(0 3px 1px rgba(21, 8, 3, 0.5));
+}
+
+.mode-button.is-selected,
+.target-row button.is-selected,
+.host-container-row button.is-selected,
+.game-dialog .mode-button.is-selected,
+.game-dialog .target-row button.is-selected {
+  background-image: var(--ui-choice-card-selected) !important;
+  color: #2b1608;
+  filter: drop-shadow(0 3px 1px rgba(21, 8, 3, 0.56));
+}
+
+.game-dialog .mode-button,
+.game-dialog .target-row button {
+  color: #f2deb0;
+}
+
+.game-dialog .mode-button strong {
+  color: #fff0c5;
+}
+
+.game-dialog .mode-button span {
+  color: rgba(241, 220, 175, 0.65);
+}
+
+.game-dialog .mode-button.is-selected strong,
+.game-dialog .mode-button.is-selected span {
+  color: #2b1608;
+}
+
+.room-join-row input,
+.host-setting-row select,
+.settings-section select,
+.player-name-fields input,
+.controller-join-card input {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-input-parchment) center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #32190a;
+  outline-offset: -5px;
+}
+
+.room-join-row input {
+  padding-inline: 24px;
+}
+
+.host-setting-row select,
+.settings-section select {
+  padding-inline: 18px 28px;
+}
+
+.player-name-fields input,
+.controller-join-card input {
+  padding-inline: 22px;
+}
+
+.room-join-row input::placeholder,
+.player-name-fields input::placeholder,
+.controller-join-card input::placeholder {
+  color: rgba(75, 43, 19, 0.56);
+}
+
+.room-server-status,
+.room-settings-summary span,
+.controller-room-rules {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-status-chip) center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: #f1ddae;
+}
+
+.room-server-status {
+  min-height: 38px;
+  padding-inline: 24px;
+}
+
+.room-settings-summary span,
+.controller-room-rules {
+  padding: 8px 15px;
+}
+
+:is(
+  .start-action,
+  .start-server-button,
+  .controller-primary-button,
+  .primary-button,
+  .controller-insert,
+  .result-card button,
+  .secondary-button,
+  .icon-button,
+  .start-local-button,
+  .room-close-button,
+  .start-panel-heading > button,
+  .dialog-close,
+  .sword-choice,
+  .controller-weapons button,
+  .controller-slots button,
+  .choice-button,
+  .mode-button,
+  .target-row button,
+  .host-container-row button
+):not(:disabled) {
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+:is(
+  .start-action,
+  .start-server-button,
+  .controller-primary-button,
+  .primary-button,
+  .controller-insert,
+  .result-card button,
+  .secondary-button,
+  .icon-button,
+  .start-local-button,
+  .room-close-button,
+  .start-panel-heading > button,
+  .dialog-close,
+  .sword-choice,
+  .controller-weapons button,
+  .controller-slots button,
+  .choice-button,
+  .mode-button,
+  .target-row button,
+  .host-container-row button
+):not(:disabled):hover {
+  filter: brightness(1.09) drop-shadow(0 5px 1px rgba(21, 8, 3, 0.54));
+  transform: translateY(-1px);
+}
+
+:is(
+  .start-action,
+  .start-server-button,
+  .controller-primary-button,
+  .primary-button,
+  .controller-insert,
+  .result-card button,
+  .secondary-button,
+  .icon-button,
+  .start-local-button,
+  .room-close-button,
+  .start-panel-heading > button,
+  .dialog-close,
+  .sword-choice,
+  .controller-weapons button,
+  .controller-slots button,
+  .choice-button,
+  .mode-button,
+  .target-row button,
+  .host-container-row button
+):not(:disabled):active {
+  filter: brightness(0.96) drop-shadow(0 2px 0 rgba(21, 8, 3, 0.5));
+  transform: translateY(2px) scale(0.99);
+}
+
+:is(
+  .start-server-button,
+  .controller-primary-button,
+  .primary-button,
+  .controller-insert,
+  .secondary-button,
+  .sword-choice,
+  .controller-weapons button,
+  .controller-slots button,
+  .choice-button
+):disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.72) saturate(0.5);
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .start-action {
+    padding-inline: 16px;
+  }
+
+  .secondary-button,
+  .icon-button {
+    padding-inline: 13px;
+  }
+
+  .room-join-row input,
+  .controller-join-card input {
+    padding-inline: 17px;
+  }
+}
