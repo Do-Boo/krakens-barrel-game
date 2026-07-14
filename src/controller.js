@@ -95,9 +95,18 @@ function setGameView(active) {
 
 function setLiveFallback(message = '3D 게임판을 불러오는 중…', detail = '연결 전에도 아래의 통을 눌러 게임할 수 있습니다.') {
   liveFrame.classList.remove('has-stream');
+  liveFrame.classList.remove('is-portrait-stream');
   liveStatus.textContent = '2D 조준 화면으로 참가 중';
   liveFallback.querySelector('strong').textContent = message;
   liveFallback.querySelector('span').textContent = detail;
+}
+
+function syncGameVideoLayout() {
+  const [videoTrack] = activeGameStream?.getVideoTracks() ?? [];
+  const settings = videoTrack?.getSettings?.() ?? {};
+  const width = gameVideo.videoWidth || Number(settings.width) || 0;
+  const height = gameVideo.videoHeight || Number(settings.height) || 0;
+  liveFrame.classList.toggle('is-portrait-stream', Boolean(width && height && height > width * 1.15));
 }
 
 function clearGameStream() {
@@ -126,6 +135,7 @@ function receiveGameStream(call, stream) {
   activeGameStream = stream;
   gameVideo.srcObject = stream;
   liveFrame.classList.add('has-stream');
+  window.requestAnimationFrame(syncGameVideoLayout);
   liveStatus.textContent = '실시간 게임판 연결됨';
   gameVideo.play().catch(() => {
     setLiveFallback('화면 재생을 시작하지 못했습니다.', '화면을 한 번 누르거나 아래의 2D 통으로 계속 참가해 주세요.');
@@ -233,6 +243,7 @@ function updateAimWeapon(style = 'classic') {
 
 function updateAimPosition() {
   const position = slotPositions[selectedSlot];
+  gamePanel.classList.toggle('has-selected-target', Boolean(position));
   aimWeapon.hidden = !position;
   if (!position) return;
   barrelTarget.style.setProperty('--aim-x', `${position[0]}%`);
@@ -515,6 +526,8 @@ liveFrame.addEventListener('click', () => {
     liveStatus.textContent = '실시간 게임판 연결됨';
   }).catch(() => {});
 });
+gameVideo.addEventListener('loadedmetadata', syncGameVideoLayout);
+gameVideo.addEventListener('resize', syncGameVideoLayout);
 
 window.addEventListener('beforeunload', () => {
   clearGameStream();

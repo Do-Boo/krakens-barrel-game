@@ -5259,3 +5259,115 @@ code,
     height: 62px;
   }
 }
+
+/* Whole-flow responsive audit fixes. */
+.loadout-toggle[hidden] {
+  display: none !important;
+}
+
+.controller-weapons {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.controller-weapons button {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  gap: 5px;
+  align-items: center;
+  justify-items: center;
+  height: 58px;
+  padding: 4px 8px !important;
+}
+
+.controller-weapons button img {
+  width: 38px;
+  height: 34px;
+}
+
+.controller-weapons button > span {
+  overflow: hidden;
+  width: 100%;
+  color: #e7d2a0;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controller-weapons button.is-selected > span {
+  color: #2a1608;
+}
+
+.controller-live-game__frame.is-portrait-stream {
+  aspect-ratio: 4 / 3;
+  max-height: none;
+}
+
+.controller-live-game__frame.is-portrait-stream video {
+  object-fit: cover;
+  object-position: 50% 48%;
+}
+
+@media (max-width: 600px) {
+  .controller-app.is-game-active .controller-game:not(.has-selected-target) .controller-insert {
+    display: none;
+  }
+
+  .game-dialog .dialog-heading {
+    position: sticky;
+    top: -16px;
+    z-index: 8;
+    padding: 4px 0 10px;
+    background: linear-gradient(180deg, #ead49c 80%, rgba(234, 212, 156, 0));
+  }
+
+  .game-dialog .primary-button {
+    position: sticky;
+    bottom: -18px;
+    z-index: 7;
+    width: 100%;
+    margin-top: 18px;
+    filter: drop-shadow(0 -5px 10px rgba(77, 38, 12, 0.22)) drop-shadow(0 5px 1px rgba(21, 8, 3, 0.52));
+  }
+
+  .open-room-card__rules span,
+  .open-room-card__state span {
+    font-size: 8px;
+  }
+
+  .start-local-button {
+    font-size: 12px;
+  }
+
+  .controller-app.is-game-active .controller-weapons button {
+    height: 58px;
+    padding: 4px 7px !important;
+  }
+
+  .controller-live-game__frame.is-portrait-stream {
+    aspect-ratio: 4 / 3;
+    max-height: none;
+  }
+}
+
+@media (max-width: 370px), (max-height: 700px) {
+  .controller-weapons button,
+  .controller-app.is-game-active .controller-weapons button {
+    grid-template-columns: 34px minmax(0, 1fr);
+    height: 52px;
+    padding-inline: 6px !important;
+  }
+
+  .controller-weapons button img {
+    width: 34px;
+    height: 30px;
+  }
+
+  .controller-weapons button > span {
+    font-size: 8px;
+  }
+}

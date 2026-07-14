@@ -1441,16 +1441,22 @@ function setLoadoutOpen(open) {
   syncLoadoutState();
 }
 
+function resetStartScreenScroll() {
+  startScreen.scrollTop = 0;
+}
+
 function showStartHome() {
   startHomePanel.hidden = false;
   hostSetupPanel.hidden = true;
   roomHostPanel.hidden = true;
+  resetStartScreenScroll();
 }
 
 function showHostSetup() {
   startHomePanel.hidden = true;
   hostSetupPanel.hidden = false;
   roomHostPanel.hidden = true;
+  resetStartScreenScroll();
 }
 
 function normalizeRoomTitle(value) {
@@ -1533,6 +1539,7 @@ function publishRoomListing() {
 function startLocalGameFromHome() {
   roomGameActive = false;
   settingsButton.hidden = false;
+  loadoutToggle.hidden = false;
   containerButtons.forEach((button) => { button.disabled = false; });
   swordButtons.forEach((button) => { button.disabled = false; });
   players = [
@@ -1897,6 +1904,7 @@ async function createOnlineRoom() {
   startHomePanel.hidden = true;
   hostSetupPanel.hidden = true;
   roomHostPanel.hidden = false;
+  resetStartScreenScroll();
   remoteQr.hidden = true;
   remoteLoading.hidden = false;
   remoteLoading.textContent = '초대장을 만드는 중…';
@@ -1972,6 +1980,7 @@ function closeOnlineRoom() {
   roomHostPanel.hidden = true;
   hostSetupPanel.hidden = true;
   startHomePanel.hidden = false;
+  resetStartScreenScroll();
   slots.forEach((slot) => { slot.userData.label.visible = false; });
   renderRoomLobby();
 }
@@ -2007,6 +2016,7 @@ function startOnlineRoomGame() {
   roomGameActive = true;
   renderRoomLobby();
   settingsButton.hidden = true;
+  loadoutToggle.hidden = true;
   containerButtons.forEach((button) => { button.disabled = true; });
   swordButtons.forEach((button) => { button.disabled = true; });
   resetRound();
