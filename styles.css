@@ -2512,3 +2512,412 @@ body::before {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Illustrated 2D UI asset pass */
+.start-screen {
+  background:
+    linear-gradient(90deg, rgba(2, 10, 14, 0.2), rgba(2, 10, 14, 0.04) 50%, rgba(2, 10, 14, 0.28)),
+    linear-gradient(0deg, rgba(2, 9, 13, 0.4), transparent 44%),
+    url('/assets/ui/tavern-menu-background.webp') center / cover no-repeat;
+}
+
+.start-screen::before {
+  background:
+    radial-gradient(circle at 50% 45%, transparent 22%, rgba(1, 8, 12, 0.18) 68%, rgba(1, 7, 10, 0.68)),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.32), transparent 28%, transparent 72%, rgba(0, 0, 0, 0.32));
+}
+
+.start-screen__content {
+  grid-template-columns: minmax(330px, 0.82fr) minmax(480px, 1.18fr);
+  gap: clamp(42px, 7vw, 96px);
+  width: min(1160px, calc(100% - 80px));
+}
+
+.start-brand {
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.42));
+}
+
+.start-brand__crest,
+.controller-header__crest {
+  display: block;
+  width: clamp(116px, 12vw, 156px);
+  height: auto;
+  margin: 0 auto 7px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.38));
+}
+
+.start-brand .brand__eyebrow {
+  margin-top: 4px;
+  color: #f0cb74;
+  text-shadow: 0 2px 7px rgba(0, 0, 0, 0.8);
+}
+
+.start-brand h1 {
+  color: #ffd36f;
+  text-shadow:
+    0 3px 0 #8b4d1e,
+    0 7px 0 #35170a,
+    0 15px 32px rgba(0, 0, 0, 0.78);
+}
+
+.start-brand > p,
+.start-brand__rule {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.start-panel {
+  isolation: isolate;
+  width: min(620px, 100%);
+  padding: 43px 50px;
+  border: 0;
+  border-radius: 25px;
+  color: #f8e8bc;
+  background:
+    radial-gradient(circle at 50% 0, rgba(55, 155, 164, 0.2), transparent 34%),
+    linear-gradient(150deg, rgba(9, 49, 57, 0.97), rgba(5, 22, 30, 0.98));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.56);
+}
+
+.start-panel::before {
+  inset: -22px -20px;
+  z-index: 0;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  pointer-events: none;
+  background: url('/assets/ui/menu-frame.png') center / 100% 100% no-repeat;
+  box-shadow: none;
+  content: '';
+}
+
+.start-panel::after {
+  display: none;
+}
+
+.start-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.start-home-panel {
+  max-width: 520px;
+}
+
+.start-screen__content:has(#host-setup-panel:not([hidden])),
+.start-screen__content:has(#room-host-panel:not([hidden])) {
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+}
+
+.start-screen__content:has(#host-setup-panel:not([hidden])) .start-brand,
+.start-screen__content:has(#room-host-panel:not([hidden])) .start-brand {
+  display: none;
+}
+
+#host-setup-panel:not([hidden]),
+#room-host-panel:not([hidden]) {
+  grid-column: 1;
+  justify-self: center;
+}
+
+.start-panel__eyebrow {
+  color: #f2c766;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
+.start-panel h2 {
+  color: #fff1c9;
+}
+
+.start-action {
+  grid-template-columns: 78px 1fr;
+  min-height: 92px;
+  padding: 10px 18px 11px 12px;
+  border: 2px solid #271208;
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.3), transparent 42%),
+    #dca33e;
+  box-shadow: inset 0 -6px 0 rgba(91, 42, 12, 0.24), 0 5px 0 #251006, 0 12px 24px rgba(0, 0, 0, 0.22);
+  clip-path: none;
+}
+
+.start-action__art {
+  grid-row: 1 / 3;
+  width: 74px;
+  height: 74px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 5px rgba(64, 28, 8, 0.28));
+}
+
+.start-action strong {
+  font-size: 20px;
+}
+
+.start-join-box {
+  grid-template-columns: 72px 1fr;
+  grid-template-rows: auto auto;
+  gap: 7px 12px;
+  align-items: center;
+  padding: 11px 14px 13px 9px;
+  border: 2px solid rgba(229, 178, 80, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(40, 18, 7, 0.68), rgba(21, 15, 13, 0.58));
+}
+
+.start-join-box__art {
+  grid-row: 1 / 3;
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.3));
+}
+
+.start-join-box label,
+.start-join-box .room-join-row {
+  grid-column: 2;
+}
+
+.start-local-button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-self: stretch;
+  justify-content: center;
+  min-height: 54px;
+  padding: 3px 12px;
+  border: 1px solid rgba(235, 199, 127, 0.35);
+  border-radius: 12px;
+  color: #ead4a3;
+  background: rgba(5, 18, 24, 0.56);
+}
+
+.start-local-button img {
+  width: 68px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.mode-button {
+  grid-template-columns: 62px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  align-items: center;
+  min-height: 76px;
+  padding: 7px 10px 7px 7px;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.mode-button > img {
+  grid-row: 1 / 3;
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(246, 212, 143, 0.38);
+  border-radius: 9px;
+  object-fit: cover;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+}
+
+.mode-button > strong,
+.mode-button > span {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.mode-button > strong {
+  align-self: end;
+}
+
+.mode-button > span {
+  align-self: start;
+}
+
+.game-dialog .mode-button {
+  grid-template-columns: 58px minmax(0, 1fr);
+  min-height: 72px;
+  border-radius: 9px;
+}
+
+.game-dialog .mode-button > img {
+  width: 54px;
+  height: 54px;
+}
+
+.host-container-row button {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 7px;
+  align-items: center;
+  min-height: 58px;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.host-container-row button img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.28));
+}
+
+.choice-button {
+  grid-template-rows: 29px auto;
+  min-height: 52px;
+  padding: 4px 2px 5px;
+}
+
+.choice-button img {
+  width: 34px;
+  height: 29px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
+
+.sword-choice {
+  display: grid;
+  height: 42px;
+  padding: 3px;
+  place-items: center;
+}
+
+.sword-choice img,
+.controller-weapons button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
+
+.controller-weapons button {
+  padding: 5px;
+}
+
+.controller-header__crest {
+  width: 82px;
+  height: auto;
+}
+
+@media (max-width: 1000px) {
+  .start-screen__content {
+    grid-template-columns: minmax(0, 680px);
+    width: min(720px, calc(100% - 48px));
+  }
+
+  .start-brand,
+  .start-panel {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .start-screen {
+    background-position: 50% center;
+  }
+
+  .start-screen__content {
+    gap: 22px;
+    width: min(100% - 24px, 560px);
+    padding: 24px 0 40px;
+  }
+
+  .start-brand__crest {
+    width: 94px;
+    height: auto;
+  }
+
+  .start-brand h1 {
+    font-size: 43px;
+  }
+
+  .start-brand > p {
+    max-width: 320px;
+  }
+
+  .start-panel {
+    padding: 36px 28px;
+    border: 0;
+    border-radius: 20px;
+    box-shadow: 0 20px 44px rgba(0, 0, 0, 0.54);
+  }
+
+  .start-panel::before {
+    inset: -14px -10px;
+  }
+
+  .start-action {
+    grid-template-columns: 66px 1fr;
+    min-height: 82px;
+    padding-left: 8px;
+  }
+
+  .start-action__art {
+    width: 64px;
+    height: 64px;
+  }
+
+  .start-action strong {
+    font-size: 17px;
+  }
+
+  .start-join-box {
+    grid-template-columns: 58px 1fr;
+    gap: 6px 8px;
+  }
+
+  .start-join-box__art {
+    width: 55px;
+    height: 55px;
+  }
+
+  .start-join-box .room-join-row {
+    grid-template-columns: 1fr 70px;
+  }
+
+  .mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-button {
+    grid-template-columns: 58px 1fr;
+    min-height: 68px;
+  }
+
+  .mode-button > img {
+    width: 52px;
+    height: 52px;
+  }
+
+  .host-container-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .host-container-row button {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    min-height: 66px;
+    padding: 5px 2px;
+    text-align: center;
+  }
+
+  .host-container-row button img {
+    width: 38px;
+    height: 38px;
+  }
+
+  .sword-choice {
+    height: 36px;
+  }
+
+  .controller-header__crest {
+    width: 72px;
+    height: auto;
+  }
+}

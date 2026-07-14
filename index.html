@@ -19,7 +19,7 @@
       <section id="start-screen" class="start-screen">
         <div class="start-screen__content">
           <header class="start-brand">
-            <span class="start-brand__crest" aria-hidden="true">☠</span>
+            <img class="start-brand__crest" src="/assets/ui/kraken-crest.png" alt="" aria-hidden="true" />
             <span class="brand__eyebrow">A PIRATE PARTY GAME</span>
             <h1>크라켄의 술통</h1>
             <p>칼을 꽂아라. 크라켄을 깨운 선원이 모든 걸 잃는다.</p>
@@ -32,16 +32,21 @@
             <span class="start-panel__eyebrow">CAPTAIN'S MENU</span>
             <h2>출항 준비</h2>
             <button id="show-host-setup" class="start-action start-action--primary" type="button">
-              <span>⚓</span><strong>새 선단 만들기</strong><small>규칙을 정하고 선원들을 초대하세요</small>
+              <img class="start-action__art" src="/assets/ui/create-crew.png" alt="" aria-hidden="true" />
+              <strong>새 선단 만들기</strong><small>규칙을 정하고 선원들을 초대하세요</small>
             </button>
             <div class="start-join-box">
+              <img class="start-join-box__art" src="/assets/ui/join-crew.png" alt="" aria-hidden="true" />
               <label for="join-room-code">초대장을 받았나요?</label>
               <div class="room-join-row">
                 <input id="join-room-code" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ABC123" aria-label="온라인 방 참가 코드" />
                 <button id="join-room-button" class="secondary-button" type="button">승선</button>
               </div>
             </div>
-            <button id="start-local-game" class="start-local-button" type="button">한 화면으로 연습 항해</button>
+            <button id="start-local-game" class="start-local-button" type="button">
+              <img src="/assets/ui/practice.png" alt="" aria-hidden="true" />
+              <span>한 화면으로 연습 항해</span>
+            </button>
           </section>
 
           <section id="host-setup-panel" class="start-panel host-setup-panel" hidden>
@@ -64,10 +69,10 @@
             <div class="host-setting-group">
               <span>게임 모드</span>
               <div class="mode-grid" role="radiogroup" aria-label="온라인 게임 모드">
-                <button class="mode-button is-selected" type="button" data-room-mode="classic" aria-pressed="true"><strong>클래식</strong><span>패배 구멍 1개</span></button>
-                <button class="mode-button" type="button" data-room-mode="double" aria-pressed="false"><strong>더블 크라켄</strong><span>패배 구멍 2개</span></button>
-                <button class="mode-button" type="button" data-room-mode="speed" aria-pressed="false"><strong>7초 속전속결</strong><span>제한 시간 7초</span></button>
-                <button class="mode-button" type="button" data-room-mode="reverse" aria-pressed="false"><strong>역전 모드</strong><span>크라켄을 깨우면 승리</span></button>
+                <button class="mode-button is-selected" type="button" data-room-mode="classic" aria-pressed="true"><img src="/assets/ui/mode-classic.webp" alt="" /><strong>클래식</strong><span>패배 구멍 1개</span></button>
+                <button class="mode-button" type="button" data-room-mode="double" aria-pressed="false"><img src="/assets/ui/mode-double.webp" alt="" /><strong>더블 크라켄</strong><span>패배 구멍 2개</span></button>
+                <button class="mode-button" type="button" data-room-mode="speed" aria-pressed="false"><img src="/assets/ui/mode-speed.webp" alt="" /><strong>7초 속전속결</strong><span>제한 시간 7초</span></button>
+                <button class="mode-button" type="button" data-room-mode="reverse" aria-pressed="false"><img src="/assets/ui/mode-reverse.webp" alt="" /><strong>역전 모드</strong><span>크라켄을 깨우면 승리</span></button>
               </div>
             </div>
 
@@ -83,9 +88,9 @@
             <div class="host-setting-group">
               <span>술통 선택</span>
               <div class="host-container-row" role="radiogroup" aria-label="온라인 게임 술통 선택">
-                <button class="is-selected" type="button" data-room-container="wood" aria-pressed="true">🪵 오크통</button>
-                <button type="button" data-room-container="drum" aria-pressed="false">🛢️ 드럼통</button>
-                <button type="button" data-room-container="powder" aria-pressed="false">💥 화약통</button>
+                <button class="is-selected" type="button" data-room-container="wood" aria-pressed="true"><img src="/assets/ui/icon-container-wood.png" alt="" />오크통</button>
+                <button type="button" data-room-container="drum" aria-pressed="false"><img src="/assets/ui/icon-container-drum.png" alt="" />드럼통</button>
+                <button type="button" data-room-container="powder" aria-pressed="false"><img src="/assets/ui/icon-container-powder.png" alt="" />화약통</button>
               </div>
             </div>
 
@@ -150,25 +155,25 @@
           <span class="loadout-group__label">통 선택</span>
           <div class="choice-row choice-row--containers" role="group" aria-label="통 선택">
             <button class="choice-button is-selected" type="button" data-container="wood" aria-pressed="true">
-              <span>🪵</span> 오크통
+              <img src="/assets/ui/icon-container-wood.png" alt="" /> 오크통
             </button>
             <button class="choice-button" type="button" data-container="drum" aria-pressed="false">
-              <span>🛢️</span> 드럼통
+              <img src="/assets/ui/icon-container-drum.png" alt="" /> 드럼통
             </button>
             <button class="choice-button" type="button" data-container="powder" aria-pressed="false">
-              <span>💥</span> 화약통
+              <img src="/assets/ui/icon-container-powder.png" alt="" /> 화약통
             </button>
           </div>
         </div>
         <div class="loadout-group">
           <span class="loadout-group__label">무기 선택</span>
           <div class="choice-row choice-row--swords" role="group" aria-label="무기 선택">
-            <button class="sword-choice is-selected" type="button" data-sword="classic" aria-label="선장 해적검" title="선장 해적검" aria-pressed="true">⚔</button>
-            <button class="sword-choice" type="button" data-sword="cutlass" aria-label="D가드 커틀러스" title="D가드 커틀러스" aria-pressed="false">☾</button>
-            <button class="sword-choice" type="button" data-sword="dagger" aria-label="크라켄 단검" title="크라켄 단검" aria-pressed="false">♆</button>
-            <button class="sword-choice" type="button" data-sword="fish" aria-label="냉동 고등어" title="냉동 고등어" aria-pressed="false">🐟</button>
-            <button class="sword-choice" type="button" data-sword="carrot" aria-label="전설의 당근" title="전설의 당근" aria-pressed="false">🥕</button>
-            <button class="sword-choice" type="button" data-sword="umbrella" aria-label="선장의 우산" title="선장의 우산" aria-pressed="false">☂</button>
+            <button class="sword-choice is-selected" type="button" data-sword="classic" aria-label="선장 해적검" title="선장 해적검" aria-pressed="true"><img src="/assets/ui/icon-weapon-classic.png" alt="" /></button>
+            <button class="sword-choice" type="button" data-sword="cutlass" aria-label="D가드 커틀러스" title="D가드 커틀러스" aria-pressed="false"><img src="/assets/ui/icon-weapon-cutlass.png" alt="" /></button>
+            <button class="sword-choice" type="button" data-sword="dagger" aria-label="크라켄 단검" title="크라켄 단검" aria-pressed="false"><img src="/assets/ui/icon-weapon-dagger.png" alt="" /></button>
+            <button class="sword-choice" type="button" data-sword="fish" aria-label="냉동 고등어" title="냉동 고등어" aria-pressed="false"><img src="/assets/ui/icon-weapon-fish.png" alt="" /></button>
+            <button class="sword-choice" type="button" data-sword="carrot" aria-label="전설의 당근" title="전설의 당근" aria-pressed="false"><img src="/assets/ui/icon-weapon-carrot.png" alt="" /></button>
+            <button class="sword-choice" type="button" data-sword="umbrella" aria-label="선장의 우산" title="선장의 우산" aria-pressed="false"><img src="/assets/ui/icon-weapon-umbrella.png" alt="" /></button>
           </div>
         </div>
       </aside>
@@ -227,15 +232,19 @@
           <span class="settings-label">게임 모드</span>
           <div class="mode-grid" role="radiogroup" aria-label="게임 모드">
             <button class="mode-button is-selected" type="button" data-mode="classic" aria-pressed="true">
+              <img src="/assets/ui/mode-classic.webp" alt="" />
               <strong>클래식</strong><span>패배 구멍 1개</span>
             </button>
             <button class="mode-button" type="button" data-mode="double" aria-pressed="false">
+              <img src="/assets/ui/mode-double.webp" alt="" />
               <strong>더블 크라켄</strong><span>패배 구멍 2개</span>
             </button>
             <button class="mode-button" type="button" data-mode="speed" aria-pressed="false">
+              <img src="/assets/ui/mode-speed.webp" alt="" />
               <strong>7초 속전속결</strong><span>시간 초과도 패배</span>
             </button>
             <button class="mode-button" type="button" data-mode="reverse" aria-pressed="false">
+              <img src="/assets/ui/mode-reverse.webp" alt="" />
               <strong>역전 모드</strong><span>크라켄을 깨우면 승리</span>
             </button>
           </div>
@@ -264,7 +273,7 @@
 
     <div id="controller-app" class="controller-app" hidden>
       <header class="controller-header">
-        <span class="controller-header__crest" aria-hidden="true">☠</span>
+        <img class="controller-header__crest" src="/assets/ui/kraken-crest.png" alt="" aria-hidden="true" />
         <span class="brand__eyebrow">KRAKEN CREW</span>
         <h1>선원용 조종패</h1>
         <p id="controller-status">온라인 방 참가 준비 중…</p>
@@ -298,12 +307,12 @@
         <section>
           <h2>무기 선택</h2>
           <div id="controller-weapons" class="controller-weapons">
-            <button class="is-selected" type="button" data-remote-weapon="classic">⚔</button>
-            <button type="button" data-remote-weapon="cutlass">☾</button>
-            <button type="button" data-remote-weapon="dagger">♆</button>
-            <button type="button" data-remote-weapon="fish">🐟</button>
-            <button type="button" data-remote-weapon="carrot">🥕</button>
-            <button type="button" data-remote-weapon="umbrella">☂</button>
+            <button class="is-selected" type="button" data-remote-weapon="classic" aria-label="선장 해적검"><img src="/assets/ui/icon-weapon-classic.png" alt="" /></button>
+            <button type="button" data-remote-weapon="cutlass" aria-label="D가드 커틀러스"><img src="/assets/ui/icon-weapon-cutlass.png" alt="" /></button>
+            <button type="button" data-remote-weapon="dagger" aria-label="크라켄 단검"><img src="/assets/ui/icon-weapon-dagger.png" alt="" /></button>
+            <button type="button" data-remote-weapon="fish" aria-label="냉동 고등어"><img src="/assets/ui/icon-weapon-fish.png" alt="" /></button>
+            <button type="button" data-remote-weapon="carrot" aria-label="전설의 당근"><img src="/assets/ui/icon-weapon-carrot.png" alt="" /></button>
+            <button type="button" data-remote-weapon="umbrella" aria-label="선장의 우산"><img src="/assets/ui/icon-weapon-umbrella.png" alt="" /></button>
           </div>
         </section>
         <section>
