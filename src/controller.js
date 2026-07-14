@@ -36,6 +36,12 @@ const roomRules = document.querySelector('#controller-room-rules');
 const readyButton = document.querySelector('#controller-ready-button');
 const gamePanel = document.querySelector('#controller-game');
 const controllerApp = document.querySelector('#controller-app');
+const liveFrame = document.querySelector('#controller-live-frame');
+const gameVideo = document.querySelector('#controller-game-video');
+const liveFallback = document.querySelector('#controller-live-fallback');
+const liveStatus = document.querySelector('#controller-live-status');
+const liveRound = document.querySelector('#controller-live-round');
+const liveScores = document.querySelector('#controller-live-scores');
 
 const modeNames = {
   classic: '클래식',
@@ -79,9 +85,105 @@ let yourPlayerIndex = null;
 let ready = false;
 let containerStyle = 'wood';
 let selectedWeapon = 'classic';
+let activeMediaCall = null;
+let activeGameStream = null;
+let streamRetryTimer = null;
 
 function setGameView(active) {
   controllerApp.classList.toggle('is-game-active', active);
+}
+
+function setLiveFallback(message = '3D 게임판을 불러오는 중…', detail = '연결 전에도 아래의 통을 눌러 게임할 수 있습니다.') {
+  liveFrame.classList.remove('has-stream');
+  liveStatus.textContent = '2D 조준 화면으로 참가 중';
+  liveFallback.querySelector('strong').textContent = message;
+  liveFallback.querySelector('span').textContent = detail;
+}
+
+function clearGameStream() {
+  window.clearTimeout(streamRetryTimer);
+  streamRetryTimer = null;
+  const previousCall = activeMediaCall;
+  activeMediaCall = null;
+  activeGameStream = null;
+  gameVideo.srcObject = null;
+  previousCall?.close();
+  setLiveFallback();
+}
+
+function requestGameStream(delay = 0) {
+  window.clearTimeout(streamRetryTimer);
+  streamRetryTimer = window.setTimeout(() => {
+    streamRetryTimer = null;
+    if (connection?.open && !activeGameStream) send({ type: 'request-game-stream' });
+  }, delay);
+}
+
+function receiveGameStream(call, stream) {
+  if (call !== activeMediaCall) return;
+  window.clearTimeout(streamRetryTimer);
+  streamRetryTimer = null;
+  activeGameStream = stream;
+  gameVideo.srcObject = stream;
+  liveFrame.classList.add('has-stream');
+  liveStatus.textContent = '실시간 게임판 연결됨';
+  gameVideo.play().catch(() => {
+    setLiveFallback('화면 재생을 시작하지 못했습니다.', '화면을 한 번 누르거나 아래의 2D 통으로 계속 참가해 주세요.');
+  });
+  stream.getVideoTracks().forEach((track) => {
+    track.addEventListener('ended', () => {
+      if (stream !== activeGameStream) return;
+      activeGameStream = null;
+      gameVideo.srcObject = null;
+      setLiveFallback('실시간 화면이 잠시 끊겼습니다.', '자동으로 다시 연결하는 동안 2D 통으로 계속 참가할 수 있습니다.');
+      requestGameStream(1800);
+    }, { once: true });
+  });
+}
+
+function handleGameCall(call) {
+  if (call.metadata?.role && call.metadata.role !== 'game-view') {
+    call.close();
+    return;
+  }
+  const previousCall = activeMediaCall;
+  activeMediaCall = call;
+  activeGameStream = null;
+  gameVideo.srcObject = null;
+  previousCall?.close();
+  liveStatus.textContent = '실시간 게임판 연결 중';
+  call.answer();
+  call.on('stream', (stream) => receiveGameStream(call, stream));
+  call.on('close', () => {
+    if (call !== activeMediaCall) return;
+    activeMediaCall = null;
+    activeGameStream = null;
+    gameVideo.srcObject = null;
+    setLiveFallback('실시간 화면이 잠시 끊겼습니다.', '자동으로 다시 연결하는 동안 2D 통으로 계속 참가할 수 있습니다.');
+    requestGameStream(1800);
+  });
+  call.on('error', () => {
+    if (call !== activeMediaCall) return;
+    activeMediaCall = null;
+    activeGameStream = null;
+    gameVideo.srcObject = null;
+    setLiveFallback('3D 화면 연결에 실패했습니다.', '2D 통으로 게임에 참여하며 자동 재연결을 기다려 주세요.');
+    requestGameStream(2400);
+  });
+}
+
+function renderLiveScores(players = [], currentPlayer = -1, yourIndex = yourPlayerIndex) {
+  liveScores.replaceChildren();
+  players.forEach((player) => {
+    const score = document.createElement('div');
+    score.className = 'controller-live-score';
+    score.classList.toggle('is-current', player.playerIndex === currentPlayer);
+    score.classList.toggle('is-you', player.playerIndex === yourIndex);
+    score.style.setProperty('--player-color', playerColors[player.playerIndex] || '#d7dee5');
+    score.innerHTML = `<span>P${player.playerIndex + 1}</span><strong></strong><b>${player.score ?? 0}</b>`;
+    score.querySelector('strong').textContent = player.playerIndex === yourIndex ? `${player.name} (나)` : player.name;
+    liveScores.append(score);
+  });
 }
 
 function readLocalValue(key) {
@@ -244,6 +346,9 @@ function applyGameState(state) {
   updateAimWeapon(state.swordStyle || selectedWeapon);
   gamePanel.classList.toggle('is-inserting', Boolean(state.isAnimating));
   tensionFill.style.width = `${Math.round((state.tension ?? 0) * 100)}%`;
+  liveRound.textContent = `라운드 ${state.roundNumber ?? '-'}`;
+  renderLiveScores(state.players, state.currentPlayer, yourPlayerIndex);
+  if (!activeGameStream && !activeMediaCall) requestGameStream(300);
   playerLabel.textContent = state.isYourTurn
     ? `${state.currentPlayerName ?? '내'} 차례입니다!`
     : `${state.currentPlayerName ?? '다른 선원'}의 차례`;
@@ -282,6 +387,7 @@ function handleDisconnect(message = '방장과 연결이 끊어졌습니다. 다
   ready = false;
   selectedSlot = null;
   connection = null;
+  clearGameStream();
   setGameView(false);
   renderSlots();
   insertButton.disabled = true;
@@ -317,6 +423,9 @@ function handleMessage(message) {
   if (message.type === 'action-rejected') statusLabel.textContent = message.reason;
   if (message.type === 'room-error') handleDisconnect(message.reason);
   if (message.type === 'room-closed') handleDisconnect(message.reason);
+  if (message.type === 'game-stream-unavailable') {
+    setLiveFallback('이 기기에서는 실시간 3D 전송을 열지 못했습니다.', '아래의 2D 통은 동일한 게임에 연결되어 있어 그대로 참가할 수 있습니다.');
+  }
   if (message.type === 'impact') navigator.vibrate?.([45, 30, 90]);
   if (message.type === 'fakeout') navigator.vibrate?.([80, 40, 80, 40, 130]);
   if (message.type === 'kraken') navigator.vibrate?.([160, 70, 220]);
@@ -333,6 +442,7 @@ function connectToRoom() {
   connection?.close();
   peer?.destroy();
   peer = new Peer(undefined, { debug: 1 });
+  peer.on('call', handleGameCall);
 
   peer.on('open', () => {
     statusLabel.textContent = '온라인 방을 찾는 중…';
@@ -398,4 +508,15 @@ insertButton.addEventListener('click', () => {
   navigator.vibrate?.([35, 25, 70]);
 });
 
-window.addEventListener('beforeunload', () => peer?.destroy());
+liveFrame.addEventListener('click', () => {
+  if (!activeGameStream) return;
+  gameVideo.play().then(() => {
+    liveFrame.classList.add('has-stream');
+    liveStatus.textContent = '실시간 게임판 연결됨';
+  }).catch(() => {});
+});
+
+window.addEventListener('beforeunload', () => {
+  clearGameStream();
+  peer?.destroy();
+});

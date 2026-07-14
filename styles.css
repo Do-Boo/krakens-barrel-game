@@ -4674,3 +4674,229 @@ code,
     min-width: 46px;
   }
 }
+
+/* Mobile players receive the host's live Three.js board instead of acting as a remote-only controller. */
+.controller-live-game {
+  padding: 12px !important;
+  border: 8px solid transparent !important;
+  border-width: 8px 10px !important;
+  border-image-source: var(--ui-choice-card) !important;
+  border-image-slice: 54 66 fill !important;
+  border-image-width: 1 !important;
+  border-image-repeat: stretch !important;
+  background: none !important;
+  filter: drop-shadow(0 5px 2px rgba(14, 6, 2, 0.55));
+}
+
+.controller-live-game__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 9px;
+}
+
+.controller-live-game__heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.controller-live-game__heading strong {
+  overflow: hidden;
+  color: #f4dfae;
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controller-live-game__heading > span:last-child {
+  flex: none;
+  color: #ddbd79;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.controller-live-game__badge {
+  color: #65e9b2;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.controller-live-game__badge i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #52e3a4;
+  box-shadow: 0 0 8px rgba(82, 227, 164, 0.8);
+  animation: live-game-pulse 1.5s ease-in-out infinite;
+}
+
+.controller-live-game__frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 7px solid transparent;
+  border-image-source: var(--ui-button-square-selected);
+  border-image-slice: 70 fill;
+  border-image-width: 1;
+  border-image-repeat: stretch;
+  background: #02080c;
+  cursor: pointer;
+}
+
+.controller-live-game__frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  background: #07141c;
+  transition: opacity 180ms ease;
+}
+
+.controller-live-game__frame.has-stream video {
+  opacity: 1;
+}
+
+.controller-live-game__fallback {
+  position: absolute;
+  inset: 7px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 16px;
+  color: #ead8ae;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(33, 155, 172, 0.2), transparent 48%),
+    #06131b;
+  text-align: center;
+}
+
+.controller-live-game__frame.has-stream .controller-live-game__fallback {
+  display: none;
+}
+
+.controller-live-game__fallback img {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 2px;
+  object-fit: contain;
+  opacity: 0.82;
+  animation: live-game-float 2.2s ease-in-out infinite;
+}
+
+.controller-live-game__fallback strong {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.controller-live-game__fallback span {
+  max-width: 270px;
+  color: #a89470;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.controller-live-scores {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.controller-live-scores::-webkit-scrollbar {
+  display: none;
+}
+
+.controller-live-score {
+  display: grid;
+  grid-template-columns: 22px minmax(50px, 1fr) 18px;
+  align-items: center;
+  min-width: 112px;
+  min-height: 30px;
+  padding: 3px 7px;
+  border: 5px solid transparent;
+  border-image-source: var(--ui-status-chip);
+  border-image-slice: 35 55 fill;
+  border-image-width: 1;
+  color: #d8c294;
+}
+
+.controller-live-score > span {
+  color: var(--player-color);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.controller-live-score > strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controller-live-score > b {
+  color: #f2cf75;
+  font-size: 11px;
+  text-align: right;
+}
+
+.controller-live-score.is-current {
+  filter: brightness(1.22) drop-shadow(0 0 5px color-mix(in srgb, var(--player-color), transparent 45%));
+}
+
+.controller-live-score.is-you > strong {
+  color: #fff0c6;
+}
+
+@keyframes live-game-pulse {
+  50% { opacity: 0.42; transform: scale(0.82); }
+}
+
+@keyframes live-game-float {
+  50% { transform: translateY(-4px); }
+}
+
+@media (max-width: 600px) {
+  .controller-app.is-game-active .controller-live-game {
+    padding: 9px !important;
+  }
+
+  .controller-live-game__heading {
+    margin-bottom: 6px;
+  }
+
+  .controller-live-game__frame {
+    max-height: 210px;
+  }
+
+  .controller-live-scores {
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 390px), (max-height: 720px) {
+  .controller-live-game__frame {
+    aspect-ratio: 16 / 8.4;
+    max-height: 170px;
+  }
+
+  .controller-live-game__fallback img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .controller-live-score {
+    min-height: 27px;
+  }
+}

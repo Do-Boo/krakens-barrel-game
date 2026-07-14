@@ -355,6 +355,7 @@ let remoteLink = '';
 let activeRoomCode = '';
 let roomGameActive = false;
 let roomCreationAttempt = 0;
+let gameCanvasStream = null;
 let roomCapacity = 4;
 let activeRoomSettings = {
   title: '크라켄 사냥 원정대',
@@ -1560,6 +1561,48 @@ function sendRemote(message) {
   connectedRoomPlayers().forEach((player) => sendToRoomPlayer(player, message));
 }
 
+function getGameCanvasStream() {
+  if (gameCanvasStream?.active) return gameCanvasStream;
+  if (typeof canvas.captureStream !== 'function') return null;
+  try {
+    gameCanvasStream = canvas.captureStream(18);
+    const [videoTrack] = gameCanvasStream.getVideoTracks();
+    if (videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint = 'motion';
+    return gameCanvasStream;
+  } catch (error) {
+    console.warn('The live 3D game view could not be captured.', error);
+    return null;
+  }
+}
+
+function closePlayerGameStream(player) {
+  const mediaCall = player?.mediaCall;
+  if (!mediaCall) return;
+  player.mediaCall = null;
+  mediaCall.close();
+}
+
+function streamGameToPlayer(player) {
+  if (!player?.connected || !player.connection?.open || !remotePeer?.open) return;
+  const stream = getGameCanvasStream();
+  if (!stream) {
+    sendToRoomPlayer(player, { type: 'game-stream-unavailable' });
+    return;
+  }
+  closePlayerGameStream(player);
+  const mediaCall = remotePeer.call(player.connection.peer, stream, {
+    metadata: { role: 'game-view', roomCode: activeRoomCode },
+  });
+  player.mediaCall = mediaCall;
+  mediaCall.on('close', () => {
+    if (player.mediaCall === mediaCall) player.mediaCall = null;
+  });
+  mediaCall.on('error', (error) => {
+    console.warn(`Live game view failed for ${player.name}.`, error);
+    if (player.mediaCall === mediaCall) player.mediaCall = null;
+  });
+}
+
 function roomState(player) {
   return {
     roomCode: activeRoomCode,
@@ -1679,6 +1722,10 @@ function rejectRoomAction(player, reason) {
 
 function handleRemoteMessage(message, player) {
   if (!message?.type) return;
+  if (message.type === 'request-game-stream') {
+    streamGameToPlayer(player);
+    return;
+  }
   if (message.type === 'controller-ready') {
     sendToRoomPlayer(player, { type: 'room-state', state: roomState(player) });
     if (roomGameActive) sendToRoomPlayer(player, { type: 'game-state', state: gameState(player) });
@@ -1755,9 +1802,11 @@ function registerRoomPlayer(connection, message) {
       connection,
       connected: true,
       ready: false,
+      mediaCall: null,
     };
     roomPlayers.set(clientId, player);
   } else {
+    closePlayerGameStream(player);
     if (player.connection?.open && player.connection !== connection) player.connection.close();
     player.name = normalizePlayerName(message.name, player.name);
     player.connection = connection;
@@ -1776,6 +1825,9 @@ function registerRoomPlayer(connection, message) {
   renderRoomLobby();
   sendRoomState();
   if (roomGameActive) sendGameState();
+  window.setTimeout(() => {
+    if (player.connected && player.connection === connection) streamGameToPlayer(player);
+  }, 120);
   showToast(`${player.name} 선원이 방에 참가했습니다`);
   return player;
 }
@@ -1798,6 +1850,7 @@ function handleRoomConnection(connection) {
     if (!player || player.connection !== connection) return;
     player.connected = false;
     player.ready = false;
+    closePlayerGameStream(player);
     remoteSelectedSlot = null;
     renderRoomLobby();
     sendRoomState();
@@ -1879,6 +1932,7 @@ function closeOnlineRoom() {
   roomDirectory.clear(activeRoomCode);
   connectedRoomPlayers().forEach((player) => {
     sendToRoomPlayer(player, { type: 'room-closed', reason: '방장이 온라인 방을 닫았습니다.' });
+    closePlayerGameStream(player);
     player.connection.close();
   });
   roomPlayers.clear();
