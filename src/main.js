@@ -11,6 +11,7 @@ import {
   normalizeRoomCode,
   roomPeerId,
 } from './room-protocol.js';
+import { RoomDirectory } from './room-directory.js';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#game-canvas');
@@ -61,6 +62,12 @@ const roomSettingsSummary = $('#room-settings-summary');
 const roomReadyGuide = $('#room-ready-guide');
 const startRoomGameButton = $('#start-room-game');
 const closeRoomButton = $('#close-room-button');
+const roomTitleInput = $('#room-title');
+const activeRoomTitle = $('#active-room-title');
+const openRoomList = $('#open-room-list');
+const roomDirectoryStatus = $('#room-directory-status');
+const refreshRoomListButton = $('#refresh-room-list');
+const randomRoomButton = $('#random-room-button');
 const toast = $('#toast');
 const containerButtons = [...document.querySelectorAll('[data-container]')];
 const swordButtons = [...document.querySelectorAll('[data-sword]')];
@@ -161,6 +168,12 @@ const CONTAINER_CONFIGS = {
       return 1.47 - normalizedHeight * normalizedHeight * 0.16;
     },
   },
+};
+
+const CONTAINER_ICONS = {
+  wood: '/assets/ui/icon-container-wood.png',
+  drum: '/assets/ui/icon-container-drum.png',
+  powder: '/assets/ui/icon-container-powder.png',
 };
 
 let players = [
@@ -344,11 +357,15 @@ let roomGameActive = false;
 let roomCreationAttempt = 0;
 let roomCapacity = 4;
 let activeRoomSettings = {
+  title: '크라켄 사냥 원정대',
   mode: 'classic',
   targetScore: 3,
   container: 'wood',
 };
 const roomPlayers = new Map();
+const roomDirectory = new RoomDirectory();
+let directoryRooms = [];
+let directoryStatus = 'connecting';
 
 function createDrumContainer() {
   const root = new THREE.Group();
@@ -1412,6 +1429,83 @@ function showHostSetup() {
   roomHostPanel.hidden = true;
 }
 
+function normalizeRoomTitle(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, 24) || '크라켄 사냥 원정대';
+}
+
+function navigateToRoom(roomCode) {
+  const normalized = normalizeRoomCode(roomCode);
+  if (normalized.length !== 6) return;
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.searchParams.set('room', normalized);
+  window.location.assign(url);
+}
+
+function availableDirectoryRooms() {
+  return directoryRooms.filter((room) => !room.started && room.playerCount < room.capacity);
+}
+
+function renderOpenRooms() {
+  const availableRooms = availableDirectoryRooms();
+  randomRoomButton.disabled = availableRooms.length === 0;
+  roomDirectoryStatus.textContent = directoryStatus === 'online'
+    ? availableRooms.length
+      ? `지금 ${availableRooms.length}개 선단이 새 선원을 기다리고 있습니다.`
+      : '현재 모집 중인 공개 선단이 없습니다.'
+    : directoryStatus === 'electing'
+      ? '새 항구지기를 정하는 중…'
+      : '열린 선단을 찾는 중…';
+
+  if (!directoryRooms.length) {
+    openRoomList.innerHTML = `
+      <div class="open-room-empty">
+        <strong>모집 중인 선단이 없습니다</strong>
+        <span>첫 번째 공개 선단을 만들어 보세요.</span>
+      </div>
+    `;
+    return;
+  }
+
+  openRoomList.innerHTML = directoryRooms.slice(0, 8).map((room) => {
+    const isFull = room.playerCount >= room.capacity;
+    const canJoin = !room.started && !isFull;
+    const status = room.started ? '항해 중' : isFull ? '정원 마감' : '모집 중';
+    return `
+      <article class="open-room-card${canJoin ? '' : ' is-unavailable'}">
+        <img src="${CONTAINER_ICONS[room.container] || CONTAINER_ICONS.wood}" alt="" />
+        <div class="open-room-card__copy">
+          <strong>${escapeHtml(room.title)}</strong>
+          <div class="open-room-card__rules">
+            <span>${escapeHtml(MODE_CONFIGS[room.mode]?.name ?? '클래식')}</span>
+            <span>${room.targetScore}점 승리</span>
+            <span>${escapeHtml(CONTAINER_CONFIGS[room.container]?.name ?? '오크통')}</span>
+          </div>
+        </div>
+        <div class="open-room-card__state">
+          <b>${room.playerCount}/${room.capacity}</b>
+          <span>${status}</span>
+        </div>
+        <button class="secondary-button open-room-join" type="button" data-join-open-room="${room.roomCode}"${canJoin ? '' : ' disabled'}>${canJoin ? '승선' : status}</button>
+      </article>
+    `;
+  }).join('');
+}
+
+function publishRoomListing() {
+  if (!activeRoomCode || !remotePeer?.open) return;
+  roomDirectory.publish({
+    roomCode: activeRoomCode,
+    title: activeRoomSettings.title,
+    capacity: roomCapacity,
+    playerCount: connectedRoomPlayers().length,
+    mode: activeRoomSettings.mode,
+    targetScore: activeRoomSettings.targetScore,
+    container: activeRoomSettings.container,
+    started: roomGameActive,
+  });
+}
+
 function startLocalGameFromHome() {
   roomGameActive = false;
   settingsButton.hidden = false;
@@ -1432,7 +1526,15 @@ function startLocalGameFromHome() {
 
 function captureRoomSettings() {
   roomCapacity = Math.min(MAX_ROOM_PLAYERS, Math.max(2, Number(roomCapacitySelect.value) || 4));
+  const title = normalizeRoomTitle(roomTitleInput.value);
+  roomTitleInput.value = title;
+  try {
+    localStorage.setItem('kraken-room-title', title);
+  } catch {
+    // Storage is optional; the title still applies to this room.
+  }
   activeRoomSettings = {
+    title,
     mode: roomModeButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomMode ?? 'classic',
     targetScore: Number(roomTargetButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomTarget ?? 3),
     container: roomContainerButtons.find((button) => button.classList.contains('is-selected'))?.dataset.roomContainer ?? 'wood',
@@ -1519,6 +1621,7 @@ function renderRoomLobby() {
   const readyCount = connectedPlayers.filter((player) => player.ready).length;
   const roomFull = connectedPlayers.length === roomCapacity;
   const allReady = roomFull && connectedPlayers.every((player) => player.ready);
+  activeRoomTitle.textContent = activeRoomSettings.title;
   roomPlayerCount.textContent = `${connectedPlayers.length} / ${roomCapacity}`;
   roomSettingsSummary.innerHTML = [
     `${roomCapacity}명`,
@@ -1567,6 +1670,7 @@ function renderRoomLobby() {
       ? `모집소 열림 · 선원 ${connectedPlayers.length}/${roomCapacity}명`
       : '모집소 열림 · 선원 접속 대기';
   }
+  publishRoomListing();
 }
 
 function rejectRoomAction(player, reason) {
@@ -1769,6 +1873,7 @@ async function createOnlineRoom() {
 }
 
 function closeOnlineRoom() {
+  roomDirectory.clear(activeRoomCode);
   connectedRoomPlayers().forEach((player) => {
     sendToRoomPlayer(player, { type: 'room-closed', reason: '방장이 온라인 방을 닫았습니다.' });
     player.connection.close();
@@ -1798,10 +1903,7 @@ function joinRoomByCode() {
     joinRoomCodeInput.focus();
     return;
   }
-  const url = new URL(window.location.href);
-  url.search = '';
-  url.searchParams.set('room', roomCode);
-  window.location.assign(url);
+  navigateToRoom(roomCode);
 }
 
 function startOnlineRoomGame() {
@@ -1823,6 +1925,7 @@ function startOnlineRoomGame() {
   roundNumber = 1;
   roundStarter = 0;
   roomGameActive = true;
+  renderRoomLobby();
   settingsButton.hidden = true;
   containerButtons.forEach((button) => { button.disabled = true; });
   swordButtons.forEach((button) => { button.disabled = true; });
@@ -2022,8 +2125,26 @@ buildSlots();
 renderPlayerNameFields();
 resetRound();
 resize();
+try {
+  roomTitleInput.value = normalizeRoomTitle(localStorage.getItem('kraken-room-title') || roomTitleInput.value);
+} catch {
+  roomTitleInput.value = normalizeRoomTitle(roomTitleInput.value);
+}
+renderOpenRooms();
+roomDirectory.addEventListener('status', (event) => {
+  directoryStatus = event.detail;
+  renderOpenRooms();
+});
+roomDirectory.addEventListener('rooms', (event) => {
+  directoryRooms = event.detail;
+  renderOpenRooms();
+});
+roomDirectory.start();
 window.addEventListener('resize', resize);
-window.addEventListener('beforeunload', () => remotePeer?.destroy());
+window.addEventListener('beforeunload', () => {
+  roomDirectory.stop();
+  remotePeer?.destroy();
+});
 canvas.addEventListener('pointerdown', onPointerDown);
 canvas.addEventListener('pointermove', onPointerMove);
 canvas.addEventListener('pointerleave', () => {
@@ -2056,6 +2177,16 @@ settingsButton.addEventListener('click', () => {
 showHostSetupButton.addEventListener('click', showHostSetup);
 backStartHomeButton.addEventListener('click', showStartHome);
 startLocalGameButton.addEventListener('click', startLocalGameFromHome);
+refreshRoomListButton.addEventListener('click', () => roomDirectory.refresh());
+randomRoomButton.addEventListener('click', () => {
+  const rooms = availableDirectoryRooms();
+  const room = rooms[Math.floor(Math.random() * rooms.length)];
+  if (room) navigateToRoom(room.roomCode);
+});
+openRoomList.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-join-open-room]');
+  if (button && !button.disabled) navigateToRoom(button.dataset.joinOpenRoom);
+});
 roomModeButtons.forEach((button) => button.addEventListener('click', () => {
   roomModeButtons.forEach((candidate) => {
     const selected = candidate === button;

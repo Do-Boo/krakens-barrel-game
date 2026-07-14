@@ -4107,3 +4107,570 @@ code,
     padding: 13px 18px;
   }
 }
+
+/* Public room browser and final alignment pass. */
+.room-browser {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 2px solid rgba(231, 177, 81, 0.46);
+  background: rgba(24, 12, 7, 0.62);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.room-browser__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.room-browser__heading h3 {
+  margin: 2px 0 0;
+  color: #fff0c5;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.room-browser-refresh {
+  width: auto;
+  min-width: 82px;
+  min-height: 36px;
+  padding: 2px 10px !important;
+  font-size: 9px;
+}
+
+.room-directory-status {
+  min-height: 16px;
+  margin: 0;
+  color: #cdb889;
+  font-size: 9px;
+}
+
+.open-room-list {
+  display: grid;
+  gap: 7px;
+  max-height: 218px;
+  overflow: auto;
+  padding-right: 3px;
+  scrollbar-color: #b57833 rgba(0, 0, 0, 0.25);
+  scrollbar-width: thin;
+}
+
+.open-room-empty {
+  display: grid;
+  min-height: 82px;
+  padding: 14px;
+  place-content: center;
+  text-align: center;
+}
+
+.open-room-empty strong {
+  color: #efd49a;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.open-room-empty span {
+  margin-top: 4px;
+  color: #aa9872;
+  font-size: 9px;
+}
+
+.open-room-card {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 50px 72px;
+  gap: 9px;
+  align-items: center;
+  min-height: 76px;
+  padding: 4px 6px;
+  border: 8px solid transparent;
+  border-width: 8px 10px;
+  border-image-source: var(--ui-choice-card);
+  border-image-slice: 54 66 fill;
+  border-image-width: 1;
+  border-image-repeat: stretch;
+  filter: drop-shadow(0 3px 1px rgba(20, 8, 3, 0.45));
+}
+
+.open-room-card.is-unavailable {
+  filter: grayscale(0.55) brightness(0.72) drop-shadow(0 3px 1px rgba(20, 8, 3, 0.4));
+}
+
+.open-room-card > img {
+  width: 44px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.open-room-card__copy {
+  min-width: 0;
+}
+
+.open-room-card__copy > strong {
+  display: block;
+  overflow: hidden;
+  color: #fff0c5;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.open-room-card__rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.open-room-card__rules span {
+  padding: 2px 5px;
+  color: #cdb98c;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 7px;
+}
+
+.open-room-card__state {
+  display: grid;
+  justify-items: center;
+}
+
+.open-room-card__state b {
+  color: #efc462;
+  font-size: 12px;
+}
+
+.open-room-card__state span {
+  color: #b9a77e;
+  font-size: 7px;
+}
+
+.open-room-join {
+  width: 72px;
+  min-height: 42px;
+  padding: 2px 7px !important;
+  font-size: 9px;
+}
+
+.random-room-button {
+  min-height: 48px;
+  padding: 5px 14px !important;
+  font-size: 13px;
+}
+
+.host-setting-row--title {
+  grid-template-columns: 110px minmax(0, 1fr);
+}
+
+.host-setting-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 4px 18px;
+  border: 9px solid transparent;
+  border-width: 9px 12px;
+  border-image-source: var(--ui-input-parchment);
+  border-image-slice: 55 62 fill;
+  border-image-width: 1;
+  border-image-repeat: stretch;
+  color: #3c210f;
+  background: none;
+  outline: none;
+}
+
+.room-host-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 9px;
+  text-align: center;
+}
+
+.room-host-title span {
+  color: #d5b66e;
+  font-size: 9px;
+}
+
+.room-host-title strong {
+  color: #fff0c5;
+  font-family: var(--font-ui);
+  font-size: 19px;
+  font-weight: 400;
+}
+
+.result-card {
+  top: 50% !important;
+  left: 50% !important;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 38px 42px;
+}
+
+.result-card[hidden] {
+  display: none;
+}
+
+.result-card__eyebrow,
+.result-card h2,
+.result-card p {
+  width: 100%;
+  text-align: center;
+}
+
+.result-card h2 {
+  margin: 0;
+  line-height: 1.15;
+}
+
+.result-card p {
+  margin: 0 0 5px;
+  line-height: 1.55;
+}
+
+.result-scores {
+  width: 100%;
+  gap: 7px;
+}
+
+.result-card button {
+  width: min(230px, 100%);
+  min-height: 58px;
+  margin-top: 5px;
+  padding: 5px 20px !important;
+}
+
+.game-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(660px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 32px));
+  margin: auto;
+  padding: 32px 38px;
+}
+
+.dialog-heading {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.dialog-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.dialog-close {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  padding: 0 !important;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.settings-section {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.settings-section--inline {
+  grid-template-columns: 120px 170px;
+  justify-content: start;
+  column-gap: 18px;
+  min-height: 54px;
+}
+
+.settings-section select {
+  width: 100%;
+  min-height: 48px;
+  padding: 4px 18px !important;
+}
+
+.player-name-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 10px 0 20px;
+}
+
+.player-name-field {
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.player-name-field span {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(46, 22, 8, 0.48);
+}
+
+.player-name-fields input {
+  min-height: 48px;
+  padding: 4px 17px !important;
+}
+
+.game-dialog .mode-grid {
+  gap: 10px;
+}
+
+.game-dialog .mode-button {
+  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  min-height: 78px;
+  padding: 7px 13px 7px 8px;
+}
+
+.game-dialog .mode-button > img {
+  grid-row: 1 / 3;
+  width: 56px;
+  height: 56px;
+}
+
+.game-dialog .mode-button strong,
+.game-dialog .mode-button span {
+  grid-column: 2;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.game-dialog .target-row button {
+  min-height: 58px;
+  padding: 5px 12px;
+}
+
+.game-dialog .primary-button {
+  min-height: 68px;
+  margin-top: 22px;
+  padding: 6px 22px !important;
+  font-size: 18px;
+}
+
+.loadout-panel {
+  gap: 16px;
+}
+
+.choice-row {
+  gap: 8px;
+}
+
+.choice-button,
+.sword-choice {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 15px;
+  align-items: center;
+  justify-items: center;
+  overflow: hidden;
+  padding: 5px 5px 6px;
+}
+
+.choice-button {
+  min-height: 76px;
+}
+
+.sword-choice {
+  height: 68px;
+}
+
+.choice-button img,
+.sword-choice img,
+.controller-weapons button img {
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.choice-button img {
+  width: 52px;
+  height: 48px;
+}
+
+.sword-choice img {
+  width: 90%;
+  height: 42px;
+}
+
+.choice-button__label,
+.sword-choice__label {
+  align-self: end;
+  overflow: hidden;
+  width: 100%;
+  color: #e8d4a5;
+  font-family: var(--font-ui);
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choice-button__label {
+  font-size: 9px;
+}
+
+.sword-choice__label {
+  font-size: 8px;
+}
+
+.choice-button.is-selected :is(.choice-button__label, .sword-choice__label),
+.sword-choice.is-selected :is(.choice-button__label, .sword-choice__label) {
+  color: #2a1608;
+}
+
+.turn-card {
+  grid-template-columns: 58px minmax(0, 1fr) 72px;
+  gap: 16px;
+  align-items: center;
+  min-width: min(620px, calc(100vw - 32px));
+  min-height: 96px;
+  padding: 14px 26px;
+}
+
+.player-badge {
+  width: 54px;
+  height: 54px;
+  border: 3px solid #32170a;
+  border-radius: 3px;
+  font-size: 17px;
+}
+
+.turn-card__copy {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+}
+
+.turn-card__label {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.turn-card strong {
+  font-size: 19px;
+  line-height: 1.15;
+}
+
+.turn-card__meta {
+  align-content: center;
+  min-width: 66px;
+}
+
+.sword-count,
+.turn-timer {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+@media (max-width: 600px) {
+  .room-browser {
+    padding: 11px;
+  }
+
+  .open-room-card {
+    grid-template-columns: 40px minmax(0, 1fr) 44px;
+    min-height: 82px;
+  }
+
+  .open-room-card > img {
+    width: 38px;
+    height: 42px;
+  }
+
+  .open-room-card__state {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .open-room-join {
+    grid-column: 2 / 4;
+    width: 100%;
+    min-height: 38px;
+  }
+
+  .host-setting-row,
+  .host-setting-row--title {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .game-dialog {
+    width: min(100% - 18px, 660px);
+    max-height: calc(100vh - 18px);
+    padding: 24px 20px;
+  }
+
+  .settings-section--inline {
+    grid-template-columns: minmax(0, 1fr) 116px;
+  }
+
+  .player-name-fields {
+    grid-template-columns: 1fr;
+    margin-bottom: 16px;
+  }
+
+  .game-dialog .mode-button {
+    min-height: 68px;
+  }
+
+  .result-card {
+    width: min(370px, calc(100vw - 42px));
+    padding: 34px 30px;
+  }
+
+  .loadout-panel {
+    width: 194px;
+  }
+
+  .choice-button {
+    min-height: 64px;
+  }
+
+  .sword-choice {
+    height: 62px;
+  }
+
+  .choice-button img {
+    width: 38px;
+    height: 36px;
+  }
+
+  .sword-choice img {
+    height: 34px;
+  }
+
+  .choice-button__label,
+  .sword-choice__label {
+    font-size: 7px;
+  }
+
+  .turn-card {
+    grid-template-columns: 48px minmax(0, 1fr) 52px;
+    gap: 10px;
+    min-width: calc(100vw - 24px);
+    min-height: 84px;
+    padding: 11px 18px;
+  }
+
+  .player-badge {
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .turn-card__label {
+    font-size: 9px;
+  }
+
+  .turn-card strong {
+    font-size: 15px;
+  }
+
+  .turn-card__meta {
+    min-width: 46px;
+  }
+}

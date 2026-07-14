@@ -35,9 +35,21 @@
               <img class="start-action__art" src="/assets/ui/create-crew.png" alt="" aria-hidden="true" />
               <strong>새 선단 만들기</strong><small>규칙을 정하고 선원들을 초대하세요</small>
             </button>
+            <section class="room-browser" aria-labelledby="room-browser-title">
+              <div class="room-browser__heading">
+                <div>
+                  <span class="start-panel__eyebrow">OPEN CREWS</span>
+                  <h3 id="room-browser-title">열린 선단</h3>
+                </div>
+                <button id="refresh-room-list" class="secondary-button room-browser-refresh" type="button">새로고침</button>
+              </div>
+              <p id="room-directory-status" class="room-directory-status">열린 선단을 찾는 중…</p>
+              <div id="open-room-list" class="open-room-list" aria-live="polite"></div>
+              <button id="random-room-button" class="start-server-button random-room-button" type="button" disabled>빠른 랜덤 승선</button>
+            </section>
             <div class="start-join-box">
               <img class="start-join-box__art" src="/assets/ui/join-crew.png" alt="" aria-hidden="true" />
-              <label for="join-room-code">초대장을 받았나요?</label>
+              <label for="join-room-code">참가 코드로 바로 승선</label>
               <div class="room-join-row">
                 <input id="join-room-code" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ABC123" aria-label="온라인 방 참가 코드" />
                 <button id="join-room-button" class="secondary-button" type="button">승선</button>
@@ -53,6 +65,11 @@
             <div class="start-panel-heading">
               <button id="back-start-home" type="button" aria-label="처음으로 돌아가기">←</button>
               <div><span class="start-panel__eyebrow">VOYAGE RULES</span><h2>항해 규칙 정하기</h2></div>
+            </div>
+
+            <div class="host-setting-row host-setting-row--title">
+              <label for="room-title">방 제목</label>
+              <input id="room-title" type="text" maxlength="24" autocomplete="off" value="크라켄 사냥 원정대" />
             </div>
 
             <div class="host-setting-row">
@@ -98,6 +115,10 @@
           </section>
 
           <section id="room-host-panel" class="start-panel room-host-panel" hidden>
+            <div class="room-host-title">
+              <span>공개 선단</span>
+              <strong id="active-room-title">크라켄 사냥 원정대</strong>
+            </div>
             <div class="room-server-status">
               <span></span>
               <strong id="remote-status" class="remote-status">선원 모집소 여는 중</strong>
@@ -155,25 +176,25 @@
           <span class="loadout-group__label">통 선택</span>
           <div class="choice-row choice-row--containers" role="group" aria-label="통 선택">
             <button class="choice-button is-selected" type="button" data-container="wood" aria-pressed="true">
-              <img src="/assets/ui/icon-container-wood.png" alt="" /> 오크통
+              <img src="/assets/ui/icon-container-wood.png" alt="" /><span class="choice-button__label">오크통</span>
             </button>
             <button class="choice-button" type="button" data-container="drum" aria-pressed="false">
-              <img src="/assets/ui/icon-container-drum.png" alt="" /> 드럼통
+              <img src="/assets/ui/icon-container-drum.png" alt="" /><span class="choice-button__label">드럼통</span>
             </button>
             <button class="choice-button" type="button" data-container="powder" aria-pressed="false">
-              <img src="/assets/ui/icon-container-powder.png" alt="" /> 화약통
+              <img src="/assets/ui/icon-container-powder.png" alt="" /><span class="choice-button__label">화약통</span>
             </button>
           </div>
         </div>
         <div class="loadout-group">
           <span class="loadout-group__label">무기 선택</span>
           <div class="choice-row choice-row--swords" role="group" aria-label="무기 선택">
-            <button class="sword-choice is-selected" type="button" data-sword="classic" aria-label="선장 해적검" title="선장 해적검" aria-pressed="true"><img src="/assets/ui/icon-weapon-classic.png" alt="" /></button>
-            <button class="sword-choice" type="button" data-sword="cutlass" aria-label="D가드 커틀러스" title="D가드 커틀러스" aria-pressed="false"><img src="/assets/ui/icon-weapon-cutlass.png" alt="" /></button>
-            <button class="sword-choice" type="button" data-sword="dagger" aria-label="크라켄 단검" title="크라켄 단검" aria-pressed="false"><img src="/assets/ui/icon-weapon-dagger.png" alt="" /></button>
-            <button class="sword-choice" type="button" data-sword="fish" aria-label="냉동 고등어" title="냉동 고등어" aria-pressed="false"><img src="/assets/ui/icon-weapon-fish.png" alt="" /></button>
-            <button class="sword-choice" type="button" data-sword="carrot" aria-label="전설의 당근" title="전설의 당근" aria-pressed="false"><img src="/assets/ui/icon-weapon-carrot.png" alt="" /></button>
-            <button class="sword-choice" type="button" data-sword="umbrella" aria-label="선장의 우산" title="선장의 우산" aria-pressed="false"><img src="/assets/ui/icon-weapon-umbrella.png" alt="" /></button>
+            <button class="sword-choice is-selected" type="button" data-sword="classic" aria-label="선장 해적검" title="선장 해적검" aria-pressed="true"><img src="/assets/ui/icon-weapon-classic.png" alt="" /><span class="sword-choice__label">해적검</span></button>
+            <button class="sword-choice" type="button" data-sword="cutlass" aria-label="D가드 커틀러스" title="D가드 커틀러스" aria-pressed="false"><img src="/assets/ui/icon-weapon-cutlass.png" alt="" /><span class="sword-choice__label">커틀러스</span></button>
+            <button class="sword-choice" type="button" data-sword="dagger" aria-label="크라켄 단검" title="크라켄 단검" aria-pressed="false"><img src="/assets/ui/icon-weapon-dagger.png" alt="" /><span class="sword-choice__label">단검</span></button>
+            <button class="sword-choice" type="button" data-sword="fish" aria-label="냉동 고등어" title="냉동 고등어" aria-pressed="false"><img src="/assets/ui/icon-weapon-fish.png" alt="" /><span class="sword-choice__label">고등어</span></button>
+            <button class="sword-choice" type="button" data-sword="carrot" aria-label="전설의 당근" title="전설의 당근" aria-pressed="false"><img src="/assets/ui/icon-weapon-carrot.png" alt="" /><span class="sword-choice__label">당근</span></button>
+            <button class="sword-choice" type="button" data-sword="umbrella" aria-label="선장의 우산" title="선장의 우산" aria-pressed="false"><img src="/assets/ui/icon-weapon-umbrella.png" alt="" /><span class="sword-choice__label">우산</span></button>
           </div>
         </div>
       </aside>
@@ -289,7 +310,7 @@
 
       <section id="controller-lobby" class="controller-lobby" hidden>
         <div class="controller-lobby__heading">
-          <div><span>대기실</span><strong id="controller-seat">선원 등록 중</strong></div>
+          <div><span id="controller-room-title">대기실</span><strong id="controller-seat">선원 등록 중</strong></div>
           <code id="controller-lobby-code">------</code>
         </div>
         <div id="controller-player-list" class="controller-player-list"></div>

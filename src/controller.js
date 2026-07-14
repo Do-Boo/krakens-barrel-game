@@ -29,6 +29,7 @@ const nameInput = document.querySelector('#controller-name');
 const joinButton = document.querySelector('#controller-join-button');
 const lobby = document.querySelector('#controller-lobby');
 const lobbyCode = document.querySelector('#controller-lobby-code');
+const lobbyTitle = document.querySelector('#controller-room-title');
 const seatLabel = document.querySelector('#controller-seat');
 const lobbyPlayerList = document.querySelector('#controller-player-list');
 const roomRules = document.querySelector('#controller-room-rules');
@@ -211,6 +212,7 @@ function applyRoomState(state) {
   ready = Boolean(me?.ready);
   seatLabel.textContent = yourPlayerIndex === null ? '선원 등록 중' : `플레이어 ${yourPlayerIndex + 1}`;
   lobbyCode.textContent = state.roomCode || roomCode || '연결됨';
+  lobbyTitle.textContent = state.settings?.title || '대기실';
   renderRoomPlayers(state.players, capacity);
   roomRules.textContent = [
     `${capacity}명`,
