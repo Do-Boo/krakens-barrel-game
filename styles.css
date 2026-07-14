@@ -5326,9 +5326,7 @@ code,
   }
 
   .game-dialog .primary-button {
-    position: sticky;
-    bottom: -18px;
-    z-index: 7;
+    position: static;
     width: 100%;
     margin-top: 18px;
     filter: drop-shadow(0 -5px 10px rgba(77, 38, 12, 0.22)) drop-shadow(0 5px 1px rgba(21, 8, 3, 0.52));
