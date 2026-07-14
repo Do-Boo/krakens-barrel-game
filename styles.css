@@ -1694,6 +1694,33 @@ body::before {
   font-weight: 400;
 }
 
+.hud,
+.tension-panel,
+.scoreboard,
+.loadout-panel,
+.hint-card,
+.turn-card {
+  transition: opacity 420ms ease, transform 520ms ease;
+}
+
+.is-pirate-reveal .hud,
+.is-pirate-reveal .tension-panel,
+.is-pirate-reveal .scoreboard,
+.is-pirate-reveal .loadout-panel,
+.is-pirate-reveal .hint-card {
+  pointer-events: none;
+  opacity: 0.16;
+}
+
+.is-pirate-reveal .turn-card {
+  opacity: 0.28;
+  transform: translate(-50%, 18px);
+}
+
+.is-pirate-reveal .result-card {
+  animation: pirate-result-in 360ms cubic-bezier(0.2, 1.2, 0.45, 1);
+}
+
 .start-action small {
   color: rgba(42, 19, 7, 0.65);
   font-weight: 800;
@@ -2237,6 +2264,10 @@ body::before {
 
 @keyframes pop-in {
   from { opacity: 0; transform: translate(-50%, -44%) scale(0.88); }
+}
+
+@keyframes pirate-result-in {
+  from { opacity: 0; transform: translate(-50%, -42%) scale(0.9) rotate(1.5deg); }
 }
 
 @keyframes danger-flash {

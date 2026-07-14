@@ -183,6 +183,7 @@ let impactKick = 0;
 let fakeoutKick = 0;
 let piratePop = 0;
 let pirateAwake = false;
+let pirateRevealCameraCaptured = false;
 let elapsed = 0;
 let lastFrameTime = 0;
 let turnDeadline = 0;
@@ -307,14 +308,19 @@ gameRoot.add(openingRoot);
 const pirate = new THREE.Group();
 const PIRATE_SIZE_MULTIPLIER = 2.6;
 const PIRATE_REST_SCALE = 0.94 * PIRATE_SIZE_MULTIPLIER;
-const PIRATE_POP_SCALE = 1.14 * PIRATE_SIZE_MULTIPLIER;
+const PIRATE_POP_SCALE = 1.02 * PIRATE_SIZE_MULTIPLIER;
 const PIRATE_NECK_CLIP_Y = 1.27;
 const PIRATE_REST_DEPTH = PIRATE_NECK_CLIP_Y * PIRATE_REST_SCALE;
 const PIRATE_REST_FORWARD = 0.32;
-const PIRATE_POP_RETREAT = 0.72;
+const PIRATE_POP_FORWARD = 0.56;
 const PIRATE_FORWARD_YAW = 0;
 const pirateClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const openingClipPoint = new THREE.Vector3();
+const pirateRevealCameraStart = new THREE.Vector3();
+const pirateRevealCameraEnd = new THREE.Vector3();
+const pirateRevealTargetStart = new THREE.Vector3();
+const pirateRevealTargetEnd = new THREE.Vector3();
+const pirateRevealHorizontal = new THREE.Vector3();
 const pirateMorphMeshes = [];
 const pirateExpression = { blink: 0, worried: 0, surprised: 0 };
 pirate.scale.setScalar(PIRATE_REST_SCALE);
@@ -1169,6 +1175,29 @@ function awardRound({ winnerIndex, loserIndex }) {
   });
 }
 
+function beginPirateReveal() {
+  if (pirateRevealCameraCaptured) return;
+  pirateRevealCameraCaptured = true;
+  pirateRevealCameraStart.copy(camera.position);
+  pirateRevealTargetStart.copy(controls.target);
+  pirateRevealHorizontal
+    .set(camera.position.x - controls.target.x, 0, camera.position.z - controls.target.z)
+    .normalize();
+  if (pirateRevealHorizontal.lengthSq() < 0.01) pirateRevealHorizontal.set(0, 0, 1);
+  pirateRevealTargetEnd.set(0, opening.position.y + 0.72, 0.18);
+  pirateRevealCameraEnd
+    .copy(pirateRevealTargetEnd)
+    .addScaledVector(pirateRevealHorizontal, 14.8);
+  pirateRevealCameraEnd.y += 5.1;
+  controls.enabled = false;
+  document.body.classList.add('is-pirate-reveal');
+  playTone(92, 0.75, 'sawtooth', 0.09);
+  playTone(185, 0.42, 'square', 0.05, 0.12);
+  playTone(48, 0.9, 'sine', 0.08, 0.05);
+  navigator.vibrate?.([140, 60, 200]);
+  sendRemote({ type: 'kraken' });
+}
+
 function endRound({ winnerIndex, loserIndex, reason }) {
   if (gameOver) return;
   gameOver = true;
@@ -1183,19 +1212,13 @@ function endRound({ winnerIndex, loserIndex, reason }) {
   resultCopy.textContent = reason;
   resultScores.innerHTML = players.map((player) => `<span>${escapeHtml(player.name)} ${player.score}점</span>`).join('');
   resultButton.textContent = matchFinished ? '새 매치 시작' : '다음 라운드';
-  window.setTimeout(triggerPirate, pirateAwake ? 650 : 190);
+  if (pirateAwake) beginPirateReveal();
+  window.setTimeout(triggerPirate, pirateAwake ? 1350 : 190);
   updateHud();
   sendGameState();
 }
 
 function triggerPirate() {
-  if (pirateAwake) {
-    playTone(92, 0.75, 'sawtooth', 0.09);
-    playTone(185, 0.42, 'square', 0.05, 0.12);
-    playTone(48, 0.9, 'sine', 0.08, 0.05);
-    navigator.vibrate?.([140, 60, 200]);
-    sendRemote({ type: 'kraken' });
-  }
   resultCard.hidden = false;
   hintLabel.textContent = pirateAwake
     ? gameMode === 'reverse' ? '크라켄의 보물이 열렸습니다!' : '크라켄 선장이 깨어났습니다!'
@@ -1220,6 +1243,14 @@ function startTurnTimer() {
 }
 
 function resetRound() {
+  if (pirateRevealCameraCaptured) {
+    camera.position.copy(pirateRevealCameraStart);
+    controls.target.copy(pirateRevealTargetStart);
+    camera.fov = 38;
+    camera.updateProjectionMatrix();
+  }
+  pirateRevealCameraCaptured = false;
+  controls.enabled = true;
   gameOver = false;
   isAnimating = false;
   hoveredSlot = null;
@@ -1233,7 +1264,7 @@ function resetRound() {
   firedFakeouts.clear();
   chooseTriggerSlots();
   resultCard.hidden = true;
-  document.body.classList.remove('is-failed', 'is-fakeout');
+  document.body.classList.remove('is-failed', 'is-fakeout', 'is-pirate-reveal');
   hintLabel.textContent = `${players[currentPlayer].name}, 어두운 구멍을 선택하세요`;
   pirate.scale.setScalar(PIRATE_REST_SCALE);
   pirate.position.set(0, opening.position.y - PIRATE_REST_DEPTH, 0);
@@ -1894,7 +1925,10 @@ function animate(time) {
   impactKick = Math.max(0, impactKick - deltaTime * 4.8);
   fakeoutKick = Math.max(0, fakeoutKick - deltaTime * 1.7);
   const totalKick = Math.max(impactKick, fakeoutKick * 0.72);
-  const baseFov = pirateAwake ? 52 : 38;
+  const revealEase = pirateAwake
+    ? THREE.MathUtils.smootherstep(piratePop, 0.02, 0.86)
+    : 0;
+  const baseFov = pirateAwake ? THREE.MathUtils.lerp(38, 47, revealEase) : 38;
   if (totalKick > 0) {
     gameRoot.rotation.z = Math.sin(elapsed * (impactKick > 0 ? 62 : 24)) * totalKick * 0.025;
     gameRoot.position.y = Math.abs(Math.sin(elapsed * 48)) * totalKick * 0.04;
@@ -1907,27 +1941,39 @@ function animate(time) {
     camera.updateProjectionMatrix();
   }
 
+  if (pirateAwake && pirateRevealCameraCaptured) {
+    camera.position.lerpVectors(pirateRevealCameraStart, pirateRevealCameraEnd, revealEase);
+    controls.target.lerpVectors(pirateRevealTargetStart, pirateRevealTargetEnd, revealEase);
+  }
+
   const pirateBaseY = opening.position.y - PIRATE_REST_DEPTH;
   let currentPirateScale = PIRATE_REST_SCALE;
   if (pirateAwake) {
-    piratePop = Math.min(1, piratePop + deltaTime * 1.5);
-    const pop = 1 - (1 - piratePop) ** 3;
-    const overshoot = piratePop < 0.7
-      ? pop / 0.92
-      : 1 + Math.sin((piratePop - 0.7) * Math.PI * 3.3) * (1 - piratePop) * 0.22;
+    piratePop = Math.min(1, piratePop + deltaTime * 0.82);
+    const pop = THREE.MathUtils.smootherstep(piratePop, 0, 0.82);
+    const launchArcProgress = Math.min(1, piratePop / 0.78);
+    const jumpArc = Math.sin(launchArcProgress * Math.PI) * 1.38;
+    const landingBounce = piratePop > 0.72
+      ? Math.sin((piratePop - 0.72) * Math.PI * 8) * (1 - piratePop) * 0.3
+      : 0;
+    const scaleOvershoot = Math.sin(Math.min(1, piratePop / 0.72) * Math.PI) * 0.1;
     currentPirateScale = THREE.MathUtils.lerp(
       PIRATE_REST_SCALE,
       PIRATE_POP_SCALE,
-      THREE.MathUtils.clamp(overshoot, 0, 1),
-    );
-    const forwardOffset = THREE.MathUtils.lerp(PIRATE_REST_FORWARD, -PIRATE_POP_RETREAT, pop);
+      pop,
+    ) * (1 + scaleOvershoot);
+    const forwardOffset = THREE.MathUtils.lerp(PIRATE_REST_FORWARD, PIRATE_POP_FORWARD, pop);
     pirate.scale.setScalar(currentPirateScale);
-    pirate.position.x = 0;
+    pirate.position.x = Math.sin(piratePop * Math.PI * 1.35) * (1 - pop) * 0.34;
     pirate.position.z = forwardOffset;
-    pirate.position.y = THREE.MathUtils.lerp(pirateBaseY, opening.position.y + 0.12, pop)
-      + Math.sin(piratePop * Math.PI) * 0.58;
-    pirate.rotation.y = PIRATE_FORWARD_YAW + Math.sin(elapsed * 4.5) * 0.16;
-    pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.2) * (1 - piratePop) * 0.12;
+    pirate.position.y = THREE.MathUtils.lerp(pirateBaseY, opening.position.y + 0.42, pop)
+      + jumpArc + landingBounce;
+    pirate.rotation.x = -Math.sin(piratePop * Math.PI) * 0.09;
+    pirate.rotation.y = PIRATE_FORWARD_YAW
+      + Math.sin(piratePop * Math.PI * 1.18) * (1 - pop) * 0.52
+      + Math.sin(elapsed * 2.6) * pop * 0.045;
+    pirate.rotation.z = Math.sin(piratePop * Math.PI * 2.1) * (1 - pop) * 0.2
+      + Math.sin(elapsed * 2.1) * pop * 0.025;
   } else if (fakeoutKick > 0) {
     const peek = Math.sin((1 - fakeoutKick) * Math.PI);
     currentPirateScale = PIRATE_REST_SCALE + peek * 0.035;
